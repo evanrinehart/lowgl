@@ -8,7 +8,7 @@ module Graphics.GL.Low (
   -- * Buffer Objects
   -- ** VBO
   VBO,
-  Usage(..),
+  UsageHint(..),
   newVBO,
   updateVBO,
   bindVBO,
@@ -216,10 +216,14 @@ instance ToGL IndexFormat where
   toGL IInt = GL_UNSIGNED_INT
 
 
-data Usage = StreamDraw | StaticDraw | DynamicDraw deriving Show
-instance ToGL Usage where
-  toGL StreamDraw = GL_STREAM_DRAW
-  toGL StaticDraw = GL_STATIC_DRAW
+data UsageHint = StaticDraw  -- ^ Data will seldomly change
+               | DynamicDraw -- ^ Data will change
+               | StreamDraw  -- ^ Data will change very often
+                 deriving Show
+
+instance ToGL UsageHint where
+  toGL StreamDraw  = GL_STREAM_DRAW
+  toGL StaticDraw  = GL_STATIC_DRAW
   toGL DynamicDraw = GL_DYNAMIC_DRAW
 
 data Attachment =
@@ -301,7 +305,7 @@ bindVAO (VAO n) = glBindVertexArray n
 
 -- | Create a buffer object from a blob of bytes. The usage argument hints
 -- at how often you will modify the data.
-newVBO :: Vector Word8 -> Usage -> IO VBO
+newVBO :: Vector Word8 -> UsageHint -> IO VBO
 newVBO src usage = do
   n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
   let len = V.length src
@@ -331,7 +335,7 @@ bindVBO (VBO n _) = glBindBuffer GL_ARRAY_BUFFER n
 
 -- | Pack a list of indexes into a new buffer object. The usage argument
 -- hints at how often you plan to modify the data.
-newElementArray :: [Int] -> IndexFormat -> Usage -> IO ElementArray
+newElementArray :: [Int] -> IndexFormat -> UsageHint -> IO ElementArray
 newElementArray xs fmt usage = do
   n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
   glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
