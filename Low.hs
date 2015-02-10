@@ -5,14 +5,15 @@ module Graphics.GL.Low (
   newVAO,
   bindVAO,
 
-  -- * VBO
+  -- * Buffer Objects
+  -- ** VBO
   VBO,
   Usage(..),
   newVBO,
   updateVBO,
   bindVBO,
 
-  -- * Element Array
+  -- ** Element Array
   ElementArray,
   IndexFormat(..),
   newElementArray,
@@ -22,12 +23,20 @@ module Graphics.GL.Low (
   -- * Shader Program
   Program,
   ProgramError(..),
+
+  -- ** Compile and Link
   newProgram,
   newProgramSafe,
+
+  -- ** Using
   useProgram,
+
+  -- ** Vertex Attributes
   VertexLayout(..),
   ComponentFormat(..),
   setVertexLayout,
+
+  -- ** Uniform Variables
   setUniform1f, 
   setUniform2f,
   setUniform3f,
@@ -277,31 +286,21 @@ instance Exception ProgramError
 class ToGL a where
   toGL :: (Num b, Eq b) => a -> b
 
--- | Create a new VAO. The only thing you can do with VAOs is assign them to
--- the vertex array binding target. At most one VAO can be assigned (bound) to
--- this binding target at a time. You need to create and bind at least one
--- VAO before rendering will work. See bindVAO for description of the effects
--- of binding a VAO.
+-- | Create a new VAO. The only thing you can do with a VAO is bind it to
+-- the vertex array binding target.
 newVAO :: IO VAO
 newVAO = do
   n <- alloca (\ptr -> glGenVertexArrays 1 ptr >> peek ptr)
   return (VAO n)
 
--- | Assign the VAO to the vertex array binding target. At most one VAO can
--- be assigned (bound) to this target at a time. While a VAO is bound it will
--- remember certain bits of configuration settings subsequently issued. These
--- include the vertex attributes of the shader program currently in use,
--- including the buffer objects to be used as the data source for those
--- attributes, and also whatever buffer object is assigned to the element
--- array buffer binding target. When a VAO is bound, any such configuration
--- that it remembered will be restored. A VAO must be bound before any
--- rendering will work. See setVertexAttributes, bindArrayBuffer, and
--- bindArrayElementBuffer for more information.
+-- | Assign the VAO to the vertex array binding target. The VAO already bound
+-- will be replaced, if any.
 bindVAO :: VAO -> IO ()
 bindVAO (VAO n) = glBindVertexArray n
 
--- | Wraps glGenBuffers glBindBuffer and glBufferData to create a buffer object
--- and fill it with data. GL_ARRAY_BUFFER will be left bound to the new object.
+
+-- | Create a buffer object from a blob of bytes. The usage argument hints
+-- at how often you will modify the data.
 newVBO :: Vector Word8 -> Usage -> IO VBO
 newVBO src usage = do
   n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
@@ -314,7 +313,8 @@ newVBO src usage = do
     (toGL usage)
   return (VBO n len)
 
--- | Update the data in current GL_ARRAY_BUFFER using glBufferSubData.
+-- | Modify the data in the currently bound VBO starting from the specified
+-- index.
 updateVBO :: Vector Word8 -> Int -> IO ()
 updateVBO src offset = do
   let len = V.length src
@@ -324,6 +324,13 @@ updateVBO src offset = do
     (fromIntegral len)
     (castPtr ptr)
 
+bindVBO :: VBO -> IO ()
+bindVBO (VBO n _) = glBindBuffer GL_ARRAY_BUFFER n
+
+
+
+-- | Pack a list of indexes into a new buffer object. The usage argument
+-- hints at how often you plan to modify the data.
 newElementArray :: [Int] -> IndexFormat -> Usage -> IO ElementArray
 newElementArray xs fmt usage = do
   n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
@@ -338,7 +345,6 @@ newElementArray xs fmt usage = do
   return (ElementArray n len fmt)
   
 
--- | Update the data in current GL_ARRAY_ELEMENT_BUFFER using glBufferSubData.
 updateElementArray :: [Int] -> IndexFormat -> Int -> IO ()
 updateElementArray xs fmt offset = marshalIndexes xs fmt $ \len ptr -> do
   glBufferSubData
@@ -347,6 +353,7 @@ updateElementArray xs fmt offset = marshalIndexes xs fmt $ \len ptr -> do
     (fromIntegral len)
     (castPtr ptr)
 
+-- | internal
 marshalIndexes :: [Int] -> IndexFormat -> (Int -> Ptr Word8 -> IO a) -> IO a
 marshalIndexes xs fmt act = case fmt of
   IByte  -> withArrayLen (map fromIntegral xs :: [Word8]) act
@@ -355,25 +362,20 @@ marshalIndexes xs fmt act = case fmt of
   IInt   -> withArrayLen (map fromIntegral xs :: [Int32])
               (\n ptr -> act n (castPtr ptr))
 
--- | Set the current GL_ARRAY_BUFFER with glBindBuffer. This buffer object will
--- be associated with vertex attributes on subsequent calls to setVertexAttributes.
-bindVBO :: VBO -> IO ()
-bindVBO (VBO n _) = glBindBuffer GL_ARRAY_BUFFER n
 
 bindElementArray :: ElementArray -> IO ()
 bindElementArray (ElementArray n _ _) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
 
 
-
+-- | Same as 'newProgram' but does not throw exceptions.
 newProgramSafe :: String -> String -> IO (Either ProgramError Program)
 newProgramSafe vcode fcode = try $ newProgram vcode fcode
 
--- | Compile the code for a vertex shader and fragment shader, then link the
--- two into a new program object. You must have at least one program in use
--- before rendering will work. A given program may have many vertex attributes,
--- uniform variables, and sampler units which need to be configured before
--- rendering will work.
-newProgram :: String -> String -> IO Program
+-- | Compile the code for a vertex shader and a fragment shader, then link
+-- them into a new program.
+newProgram :: String -- ^ vertex shader source code
+           -> String -- ^ fragment shader source code
+           -> IO Program
 newProgram vcode fcode = do
   vertexShaderId <- compileShader vcode VertexShader
   fragmentShaderId <- compileShader fcode FragmentShader
@@ -399,6 +401,7 @@ newProgram vcode fcode = do
 useProgram :: Program -> IO ()
 useProgram (Program n) = glUseProgram n
 
+-- | internal
 compileShader :: String -> ShaderType -> IO GLuint
 compileShader code vertOrFrag = do
   shaderId <- glCreateShader (toGL vertOrFrag)
