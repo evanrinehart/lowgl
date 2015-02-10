@@ -48,6 +48,8 @@ module Graphics.GL.Low (
   Cube(..),
   newTexture2D,
   newCubeMap,
+  newEmptyTexture2D,
+  newEmptyCubeMap,
   setActiveTextureUnit,
   bindTexture2D,
   bindTextureCubeMap,
@@ -117,10 +119,8 @@ module Graphics.GL.Low (
   FBO,
   Attachment(..),
   defaultFBO,
-  newFramebufferObject,
+  newFramebuffer,
   bindFramebuffer,
-  newEmptyTexture2D,
-  newEmptyCubeMap,
   framebufferColorAttachment,
   framebufferDepthAttachment,
   framebufferStencilAttachment,
@@ -324,10 +324,6 @@ updateVBO src offset = do
     (fromIntegral len)
     (castPtr ptr)
 
--- | Wraps glGenBuffers glBindBuffer and glBufferData to create a buffer object
--- containing vertex indices. If some of the indexes are too large to be
--- represented in the given IndexFormat this will fail. The new buffer object
--- will be left bound to GL_ELEMENT_ARRAY_BUFFER.
 newElementArray :: [Int] -> IndexFormat -> Usage -> IO ElementArray
 newElementArray xs fmt usage = do
   n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
@@ -364,9 +360,6 @@ marshalIndexes xs fmt act = case fmt of
 bindVBO :: VBO -> IO ()
 bindVBO (VBO n _) = glBindBuffer GL_ARRAY_BUFFER n
 
--- | Set the current GL_ARRAY_ELEMENT_BUFFER with glBindBuffer. This buffer
--- object will be used as the source of vertex indices on sequent calls to
--- indexed rendering commands.
 bindElementArray :: ElementArray -> IO ()
 bindElementArray (ElementArray n _ _) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
 
@@ -401,8 +394,8 @@ newProgram vcode fcode = do
   glDeleteShader fragmentShaderId
   return (Program programId)
 
--- | Wraps useProgram to install the given shader program as the current
--- program.
+-- | Install program into render pipeline. Replaces the program already in
+-- use, if any.
 useProgram :: Program -> IO ()
 useProgram (Program n) = glUseProgram n
 
@@ -474,9 +467,6 @@ totalLayout layout = sum (map arraySize layout) where
 
 
 
--- | Set a uniform's value in the current program. To set an array uniform
--- provide a list of 1 or more values. To set a non-array uniform provide a
--- list of exactly 1 value. An empty list is invalid.
 setUniform1f :: Program -> String -> [Float] -> IO ()
 setUniform1f = setUniform glUniform1fv
 
@@ -578,7 +568,7 @@ drawIndexedTriangleFan = drawIndexed GL_TRIANGLE_FAN
 drawIndexed :: GLenum -> Int -> IndexFormat -> IO ()
 drawIndexed mode n fmt = glDrawElements mode (fromIntegral n) (toGL fmt) nullPtr
 
--- | Create a new 2D texture from texture data.
+-- | Create a new 2D texture from a blob.
 newTexture2D :: Vector Word8 -> ImageFormat -> IO Tex2D
 newTexture2D bytes (ImageFormat w h pixfmt)  = do
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
@@ -595,7 +585,7 @@ newTexture2D bytes (ImageFormat w h pixfmt)  = do
     (castPtr ptr)
   return (Tex2D n)
 
--- | Create a new cube map texture from six sources of texture data.
+-- | Create a new cube map texture from six blobs.
 newCubeMap :: Cube (Vector Word8, ImageFormat) -> IO CubeMap
 newCubeMap (Cube s1 s2 s3 s4 s5 s6) = do
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
@@ -620,14 +610,48 @@ loadCubeMapSide (bytes, ImageFormat w h pixfmt) side = do
     (toGL pixfmt)
     GL_UNSIGNED_BYTE
     (castPtr ptr)
+
+-- | Create an empty texture with the specified dimensions.
+newEmptyTexture2D :: Int -> Int -> IO Tex2D
+newEmptyTexture2D w' h' = do
+  let w = fromIntegral w'
+  let h = fromIntegral h'
+  tex <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
+  glBindTexture GL_TEXTURE_2D tex
+  glTexImage2D GL_TEXTURE_2D 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
+  return (Tex2D tex)
+
+-- | Create a cubemap texture where each of the six sides has the specified
+-- dimensions.
+newEmptyCubeMap :: Int -> Int -> IO CubeMap
+newEmptyCubeMap w' h' = do
+  let w = fromIntegral w'
+  let h = fromIntegral h'
+  tex <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
+  glBindTexture GL_TEXTURE_CUBE_MAP tex
+  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_X 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Y 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
+  return (CubeMap tex)
   
 
-
+-- | Bind a 2D texture to GL_TEXTURE_2D texture binding target and the currently
+-- active texture unit.
 bindTexture2D :: Tex2D -> IO ()
 bindTexture2D (Tex2D n) = glBindTexture GL_TEXTURE_2D n
 
+-- | Bind a cubemap texture to GL_TEXTURE_CUBE_MAP texture binding target and
+-- the currently active texture unit.
 bindTextureCubeMap :: CubeMap -> IO ()
 bindTextureCubeMap (CubeMap n) = glBindTexture GL_TEXTURE_CUBE_MAP n
+
+-- | Set the active texture unit. The default is zero.
+setActiveTextureUnit :: Enum a => a -> IO ()
+setActiveTextureUnit n =
+  (glActiveTexture . fromIntegral) (GL_TEXTURE0 + fromEnum n)
 
 setTex2DFiltering :: Filtering -> IO ()
 setTex2DFiltering filt = do
@@ -652,41 +676,45 @@ setCubeMapWrapping wrap = do
 
   
 
-setActiveTextureUnit :: Enum a => a -> IO ()
-setActiveTextureUnit n =
-  (glActiveTexture . fromIntegral) (GL_TEXTURE0 + fromEnum n)
-
+-- | Allow rendering commands to modify the color buffer of the current
+-- framebuffer.
 enableColorWriting :: IO ()
 enableColorWriting = glColorMask GL_TRUE GL_TRUE GL_TRUE GL_TRUE
 
 disableColorWriting :: IO ()
 disableColorWriting = glColorMask GL_FALSE GL_FALSE GL_FALSE GL_FALSE
 
+-- | Clear the color buffer of the current framebuffer with the specified
+-- color. Has no effect if writing to the color buffer is disabled.
 clearColorBuffer :: Color -> IO ()
 clearColorBuffer (Color r g b a) = do
   glClearColor (realToFrac r) (realToFrac g) (realToFrac b) (realToFrac a)
   glClear GL_COLOR_BUFFER_BIT
 
+-- | Enable the depth test. Attempting to render pixels with a depth value
+-- greater than the depth buffer at those pixels will have no effect.
 enableDepthTest :: IO ()
 enableDepthTest = glEnable GL_DEPTH_TEST
 
+-- | Disable the depth test. Rendering will not be affected by the depth.
+-- Use this to render graphics even if they are behind something.
 disableDepthTest :: IO ()
 disableDepthTest = glDisable GL_DEPTH_TEST
 
+-- | Enable writing depth values to the depth buffer of the current framebuffer.
+-- It is enabled by default.
 enableDepthWriting :: IO ()
 enableDepthWriting = glDepthMask GL_TRUE
 
+-- | Disable writing to the depth buffer.
 disableDepthWriting :: IO ()
 disableDepthWriting = glDepthMask GL_FALSE
 
+-- | Clear the depth buffer with the maximum depth value.
 clearDepthBuffer :: IO ()
 clearDepthBuffer = glClear GL_DEPTH_BUFFER_BIT
 
--- stencil buffer, stencil test
 
--- | Enable the stencil test. Pixels will only be rendered to parts of the
--- screen where the stencil buffer is zero (unless they are excluded by
--- another test). This action disables writing to the stencil buffer.
 enableStencilTest :: IO ()
 enableStencilTest = do
   glStencilFunc GL_LESS 1 maxBound
@@ -701,21 +729,16 @@ disableStencilTest = glDisable GL_STENCIL_TEST
 clearStencilBuffer :: IO ()
 clearStencilBuffer = glClear GL_STENCIL_BUFFER_BIT
 
--- | Enable writing to the stencil buffer. Primitive pixels that pass the depth
--- test (if enabled) will write a 1 to the stencil buffer at that location.
 enableStencilWriting :: IO ()
 enableStencilWriting = do
   glStencilFunc GL_ALWAYS 1 maxBound
   glStencilOp GL_KEEP GL_KEEP GL_REPLACE
   glStencilMask 1
 
--- | Disable writing to the stencil buffer. Rendering commands will not affect
--- the stencil buffer.
 disableStencilWriting :: IO ()
 disableStencilWriting = glStencilMask 0
 
 
--- scissor box, scissor test
 
 -- | Set the scissor box. Graphics outside this box will not be rendered as
 -- long as the scissor test is enabled.
@@ -732,7 +755,6 @@ enableScissorTest = glEnable GL_SCISSOR_TEST
 disableScissorTest :: IO ()
 disableScissorTest = glDisable GL_SCISSOR_TEST
 
--- front/back face culling
 
 -- | Enable facet culling. The argument specifies whether front faces, back
 -- faces, or both will be omitted from rendering. If both front and back
@@ -757,46 +779,11 @@ setViewport (Viewport x y w h) =
 -- | Create a framebuffer object. Before the framebuffer can be used for
 -- rendering it must have a color attachment texture and that texture must
 -- have been initialized with storage.
-newFramebufferObject :: IO FBO
-newFramebufferObject = do
+newFramebuffer :: IO FBO
+newFramebuffer = do
   n <- alloca (\ptr -> glGenFramebuffers 1 ptr >> peek ptr)
   return (FBO n)
 
--- | Create an empty 2D texture object with the specified dimensions,
--- filtering, and wrapping.
-newEmptyTexture2D :: Int -> Int -> Filtering -> Wrapping -> IO Tex2D
-newEmptyTexture2D w' h' filt wrap = do
-  let w = fromIntegral w'
-  let h = fromIntegral h'
-  tex <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
-  glBindTexture GL_TEXTURE_2D tex
-  glTexImage2D GL_TEXTURE_2D 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER (toGL filt)
-  glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER (toGL filt)
-  glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S (toGL wrap)
-  glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T (toGL wrap)
-  glBindTexture GL_TEXTURE_2D 0
-  return (Tex2D tex)
-
-newEmptyCubeMap :: Int -> Int -> Filtering -> IO CubeMap
-newEmptyCubeMap w' h' filt = do
-  let w = fromIntegral w'
-  let h = fromIntegral h'
-  tex <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
-  glBindTexture GL_TEXTURE_CUBE_MAP tex
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_X 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Y 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_S GL_CLAMP_TO_EDGE
-  glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_T GL_CLAMP_TO_EDGE
-  glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_R GL_CLAMP_TO_EDGE
-  glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_MIN_FILTER (toGL filt)
-  glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_MAG_FILTER (toGL filt)
-  glBindTexture GL_TEXTURE_CUBE_MAP 0
-  return (CubeMap tex)
 
 -- | Install a color attachment for the framebuffer currently bound.
 framebufferColorAttachment :: Attachment -> IO ()
