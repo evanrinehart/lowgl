@@ -1,14 +1,32 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module Graphics.GL.Low (
+  -- * VAO
+  VAO,
   newVAO,
   bindVAO,
+
+  -- * VBO
+  VBO,
+  Usage(..),
   newVBO,
   updateVBO,
   bindVBO,
+
+  -- * Element Array
+  ElementArray,
+  IndexFormat(..),
   newElementArray,
   updateElementArray,
   bindElementArray,
+
+  -- * Shader Program
+  Program,
+  ProgramError(..),
   newProgram,
+  newProgramSafe,
   useProgram,
+  VertexLayout(..),
+  ComponentFormat(..),
   setVertexLayout,
   setUniform1f, 
   setUniform2f,
@@ -18,9 +36,31 @@ module Graphics.GL.Low (
   setUniform2i,
   setUniform3i,
   setUniform4i,
-  setUniform44,
-  setUniform33,
   setUniform22,
+  setUniform33,
+  setUniform44,
+
+  -- * Textures
+  Tex2D,
+  CubeMap,
+  ImageFormat(..),
+  PixelFormat(..),
+  Cube(..),
+  newTexture2D,
+  newCubeMap,
+  setActiveTextureUnit,
+  bindTexture2D,
+  bindTextureCubeMap,
+  Filtering(..),
+  setTex2DFiltering,
+  setCubeMapFiltering,
+  Wrapping(..),
+  setTex2DWrapping,
+  setCubeMapWrapping,
+
+  -- * Rendering
+
+  -- ** Primitives
   drawPoints,
   drawLines,
   drawLineStrip,
@@ -28,6 +68,8 @@ module Graphics.GL.Low (
   drawTriangles,
   drawTriangleStrip,
   drawTriangleFan,
+
+  -- ** Primitives by Index
   drawIndexedPoints,
   drawIndexedLines,
   drawIndexedLineStrip,
@@ -35,47 +77,61 @@ module Graphics.GL.Low (
   drawIndexedTriangles,
   drawIndexedTriangleStrip,
   drawIndexedTriangleFan,
-  newTexture2D,
-  newCubeMap,
-  bindTexture2D,
-  bindTextureCubeMap,
-  setTex2DFiltering,
-  setCubeMapFiltering,
-  setTex2DWrapping,
-  setCubeMapWrapping,
-  setActiveTextureUnit,
+
+  -- ** Color Buffer
   enableColorWriting,
   disableColorWriting,
+  Color(..),
   clearColorBuffer,
+
+  -- ** Depth Test
   enableDepthTest,
   disableDepthTest,
   enableDepthWriting,
   disableDepthWriting,
   clearDepthBuffer,
+
+  -- ** Stencil Test
   enableStencilTest,
   disableStencilTest,
   clearStencilBuffer,
   enableStencilWriting,
   disableStencilWriting,
-  setScissor,
+
+  -- ** Scissor Test
+  setScissorBox,
   enableScissorTest,
   disableScissorTest,
+
+  -- ** Facet Culling
+  Culling(..),
   enableCulling,
   disableCulling,
+
+  -- ** Viewport
+  Viewport(..),
   setViewport,
+
+
+  -- * Framebuffers
+  FBO,
+  Attachment(..),
+  defaultFBO,
   newFramebufferObject,
+  bindFramebuffer,
   newEmptyTexture2D,
   newEmptyCubeMap,
   framebufferColorAttachment,
   framebufferDepthAttachment,
   framebufferStencilAttachment,
-  framebufferAttachment,
-  bindFramebuffer,
-  defaultFBO
+
+  -- * Renderbuffers
+  RBO
 
 ) where
 
 import Control.Exception
+import Data.Typeable
 import Foreign.Ptr
 import Foreign.Storable
 import Foreign.Marshal
@@ -88,14 +144,14 @@ import Data.Int
 import Linear
 import Graphics.GL
 
-newtype VAO = VAO GLuint deriving (Eq, Show)
-newtype Program = Program GLuint deriving (Show)
-data VBO = VBO GLuint Int deriving (Eq, Show)
-data ElementArray = ElementArray GLuint Int IndexFormat deriving (Show)
-newtype CubeMap = CubeMap GLuint deriving (Show)
-newtype Tex2D = Tex2D GLuint deriving (Show)
-newtype FBO = FBO GLuint deriving (Show)
-newtype RBO = RBO GLuint deriving (Show)
+newtype VAO = VAO GLuint deriving Show
+newtype Program = Program GLuint deriving Show
+data VBO = VBO GLuint Int deriving Show
+data ElementArray = ElementArray GLuint Int IndexFormat deriving Show
+newtype CubeMap = CubeMap GLuint deriving Show
+newtype Tex2D = Tex2D GLuint deriving Show
+newtype FBO = FBO GLuint deriving Show
+newtype RBO = RBO GLuint deriving Show
 
 data Filtering = Nearest | Linear deriving Show
 instance ToGL Filtering where
@@ -203,10 +259,20 @@ data Cube a = Cube
   , cubeFront  :: a
   , cubeBack   :: a } deriving Show
 
+data ShaderType = VertexShader | FragmentShader deriving Show
 
--- | Class for sources of texture data.
-class TexData a where
-   toTexData :: a -> (Vector Word8, ImageFormat)
+instance ToGL ShaderType where
+  toGL VertexShader = GL_VERTEX_SHADER
+  toGL FragmentShader = GL_FRAGMENT_SHADER
+
+data ProgramError =
+  VertexShaderError String |
+  FragmentShaderError String |
+  LinkError String
+    deriving (Show, Typeable)
+  
+instance Exception ProgramError
+
 
 class ToGL a where
   toGL :: (Num b, Eq b) => a -> b
@@ -304,6 +370,11 @@ bindVBO (VBO n _) = glBindBuffer GL_ARRAY_BUFFER n
 bindElementArray :: ElementArray -> IO ()
 bindElementArray (ElementArray n _ _) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
 
+
+
+newProgramSafe :: String -> String -> IO (Either ProgramError Program)
+newProgramSafe vcode fcode = try $ newProgram vcode fcode
+
 -- | Compile the code for a vertex shader and fragment shader, then link the
 -- two into a new program object. You must have at least one program in use
 -- before rendering will work. A given program may have many vertex attributes,
@@ -311,8 +382,8 @@ bindElementArray (ElementArray n _ _) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
 -- rendering will work.
 newProgram :: String -> String -> IO Program
 newProgram vcode fcode = do
-  vertexShaderId <- compileShader vcode GL_VERTEX_SHADER
-  fragmentShaderId <- compileShader fcode GL_FRAGMENT_SHADER
+  vertexShaderId <- compileShader vcode VertexShader
+  fragmentShaderId <- compileShader fcode FragmentShader
   programId <- glCreateProgram
   glAttachShader programId vertexShaderId
   glAttachShader programId fragmentShaderId
@@ -325,12 +396,7 @@ newProgram vcode fcode = do
     errors <- allocaArray len $ \ptr -> do
       glGetProgramInfoLog programId (fromIntegral len) nullPtr ptr
       peekCString ptr
-    putStrLn "Shader program failed to link:"
-    putStrLn ("vertex shader " ++ show vertexShaderId)
-    putStrLn ("fragment shader " ++ show fragmentShaderId)
-    putStrLn "Error log:"
-    putStrLn errors
-    error "bailing on shader failure"
+    throwIO (LinkError errors)
   glDeleteShader vertexShaderId
   glDeleteShader fragmentShaderId
   return (Program programId)
@@ -340,9 +406,9 @@ newProgram vcode fcode = do
 useProgram :: Program -> IO ()
 useProgram (Program n) = glUseProgram n
 
-compileShader :: String -> GLenum -> IO GLuint
+compileShader :: String -> ShaderType -> IO GLuint
 compileShader code vertOrFrag = do
-  shaderId <- glCreateShader vertOrFrag
+  shaderId <- glCreateShader (toGL vertOrFrag)
   withCString code $ \ptr -> with ptr $ \pptr -> do
     glShaderSource shaderId 1 pptr nullPtr
     glCompileShader shaderId
@@ -354,11 +420,9 @@ compileShader code vertOrFrag = do
     errors <- allocaArray len $ \ptr -> do
       glGetShaderInfoLog shaderId (fromIntegral len) nullPtr ptr
       peekCString ptr
-    putStrLn "Shader failed to compile:"
-    putStrLn code
-    putStrLn "Error log:"
-    putStrLn errors
-    error "bailing on link failure"
+    case vertOrFrag of
+      VertexShader -> throwIO (VertexShaderError errors)
+      FragmentShader -> throwIO (FragmentShaderError errors)
   return shaderId
 
 -- | Set the configuration of a set of vertex attributes for the current
@@ -466,11 +530,6 @@ setUniform glAction (Program p) name xs = withArrayLen xs $ \n bytes -> do
 
   
 
--- | Render primitives according to the currently bound VAO and the currently
--- in-use program, to a framebuffer. The target framebuffer or framebuffers
--- can be configured (see bindFramebuffer). This will render a certain number
--- of primitives of a certain type using vertex data that has already been
--- specified with setVertexLayout and is saved in the VAO.
 drawPoints :: Int -> IO ()
 drawPoints = drawArrays GL_POINTS
 
@@ -495,8 +554,6 @@ drawTriangleFan = drawArrays GL_TRIANGLE_FAN
 drawArrays :: GLenum -> Int -> IO ()
 drawArrays mode n = glDrawArrays mode (fromIntegral n) 0
 
--- | Render primitives using vertex indices in the buffer object bound to
--- the element array buffer binding target.
 drawIndexedPoints :: Int -> IndexFormat -> IO ()
 drawIndexedPoints = drawIndexed GL_POINTS
 
@@ -522,9 +579,8 @@ drawIndexed :: GLenum -> Int -> IndexFormat -> IO ()
 drawIndexed mode n fmt = glDrawElements mode (fromIntegral n) (toGL fmt) nullPtr
 
 -- | Create a new 2D texture from texture data.
-newTexture2D :: TexData a => a -> IO Tex2D
-newTexture2D src = do
-  let (bytes, ImageFormat w h pixfmt) = toTexData src
+newTexture2D :: Vector Word8 -> ImageFormat -> IO Tex2D
+newTexture2D bytes (ImageFormat w h pixfmt)  = do
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_2D n
   unsafeWith bytes $ \ptr -> glTexImage2D
@@ -540,7 +596,7 @@ newTexture2D src = do
   return (Tex2D n)
 
 -- | Create a new cube map texture from six sources of texture data.
-newCubeMap :: TexData a => Cube a -> IO CubeMap
+newCubeMap :: Cube (Vector Word8, ImageFormat) -> IO CubeMap
 newCubeMap (Cube s1 s2 s3 s4 s5 s6) = do
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_CUBE_MAP n
@@ -552,9 +608,8 @@ newCubeMap (Cube s1 s2 s3 s4 s5 s6) = do
   loadCubeMapSide s6 GL_TEXTURE_CUBE_MAP_NEGATIVE_Z
   return (CubeMap n)
   
-loadCubeMapSide :: TexData a => a -> GLenum -> IO ()
-loadCubeMapSide src side = do
-  let (bytes, ImageFormat w h pixfmt) = toTexData src
+loadCubeMapSide :: (Vector Word8, ImageFormat) -> GLenum -> IO ()
+loadCubeMapSide (bytes, ImageFormat w h pixfmt) side = do
   unsafeWith bytes $ \ptr -> glTexImage2D
     side
     0
@@ -664,8 +719,8 @@ disableStencilWriting = glStencilMask 0
 
 -- | Set the scissor box. Graphics outside this box will not be rendered as
 -- long as the scissor test is enabled.
-setScissor :: Viewport -> IO ()
-setScissor (Viewport x y w h) =
+setScissorBox :: Viewport -> IO ()
+setScissorBox (Viewport x y w h) =
   glScissor (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
 
 -- | Enable the scissor test. Graphics outside the scissor box will not be
