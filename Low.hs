@@ -138,6 +138,9 @@ module Graphics.GL.Low (
   enableCulling,
   disableCulling,
 
+  -- ** Blending
+
+
   -- ** Viewport
   Viewport(..),
   setViewport,
