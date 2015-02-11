@@ -123,19 +123,29 @@ module Graphics.GL.Low (
   Viewport(..),
   setViewport,
 
-
   -- * Framebuffers
   FBO,
-  Attachment(..),
   defaultFBO,
   newFramebuffer,
   bindFramebuffer,
-  framebufferColorAttachment,
-  framebufferDepthAttachment,
-  framebufferStencilAttachment,
+  attachTex2DColor,
+  attachCubeLeftColor,
+  attachCubeRightColor,
+  attachCubeTopColor,
+  attachCubeBottomColor,
+  attachCubeFrontColor,
+  attachCubeBackColor,
+  attachRBOColor,
+  attachRBODepth,
+  attachRBODepthStencil,
 
   -- * Renderbuffers
-  RBO
+  RBOColor,
+  RBODepth,
+  RBODepthStencil,
+  newRBOColor,
+  newRBODepth,
+  newRBODepthStencil
 
 ) where
 
@@ -150,6 +160,8 @@ import qualified Data.Vector.Storable as V (length)
 import Control.Monad
 import Data.Word
 import Data.Int
+import Data.Functor
+
 import Linear
 import Graphics.GL
 
@@ -160,7 +172,7 @@ data ElementArray = ElementArray GLuint Int IndexFormat deriving Show
 newtype CubeMap = CubeMap GLuint deriving Show
 newtype Tex2D = Tex2D GLuint deriving Show
 newtype FBO = FBO GLuint deriving Show
-newtype RBO = RBO GLuint deriving Show
+data RBO = RBO GLuint InternalFormat deriving Show
 
 data Filtering = Nearest | Linear deriving Show
 instance ToGL Filtering where
@@ -211,10 +223,9 @@ data VertexLayout =
 
 data IndexFormat = IByte | IShort | IInt deriving Show
 instance ToGL IndexFormat where
-  toGL IByte = GL_UNSIGNED_BYTE
-  toGL IShort = GL_UNSIGNED_INT
-  toGL IInt = GL_UNSIGNED_INT
-
+  toGL IByte  = GL_UNSIGNED_BYTE
+  toGL IShort = GL_UNSIGNED_SHORT
+  toGL IInt   = GL_UNSIGNED_INT
 
 data UsageHint = StaticDraw  -- ^ Data will seldomly change
                | DynamicDraw -- ^ Data will change
@@ -225,17 +236,6 @@ instance ToGL UsageHint where
   toGL StreamDraw  = GL_STREAM_DRAW
   toGL StaticDraw  = GL_STATIC_DRAW
   toGL DynamicDraw = GL_DYNAMIC_DRAW
-
-data Attachment =
-  AttachTex2D Tex2D |
-  AttachCubeLeft CubeMap |
-  AttachCubeRight CubeMap |
-  AttachCubeTop CubeMap |
-  AttachCubeBottom CubeMap |
-  AttachCubeFront CubeMap |
-  AttachCubeBack CubeMap |
-  AttachRenderbuffer RBO
-    deriving (Show)
 
 data Color = Color !Float !Float !Float !Float deriving Show
 
@@ -249,8 +249,6 @@ instance ToGL PixelFormat where
   toGL RGB = GL_RGB
   toGL RGBA = GL_RGBA
 
-
-
 data Viewport = Viewport
   { viewportX :: Int
   , viewportY :: Int
@@ -263,6 +261,18 @@ data ImageFormat = ImageFormat
   , imageHeight :: Int
   , imageFormat :: PixelFormat }
     deriving (Show)
+
+-- | Internal format for renderbuffers.
+data InternalFormat =
+  RGB8 | -- ^ A 24-bit color buffer
+  DepthComponent24 | -- ^ A 24-bit depth buffer
+  Depth24Stencil8  -- ^ A combination 24-bit depth buffer and 8-bit stencil
+    deriving Show
+
+instance ToGL InternalFormat where
+  toGL RGB8 = GL_RGB8
+  toGL DepthComponent24 = GL_DEPTH_COMPONENT24
+  toGL Depth24Stencil8  = GL_DEPTH24_STENCIL8
 
 data Cube a = Cube
   { cubeRight  :: a
@@ -471,6 +481,38 @@ totalLayout :: [VertexLayout] -> Int
 totalLayout layout = sum (map arraySize layout) where
   arraySize (Unused n) = n
   arraySize (Attrib _ n fmt) = n * sizeOfVertexComponent fmt
+
+sizeOfVertexComponent :: ComponentFormat -> Int
+sizeOfVertexComponent c = case c of
+  VByte -> 1
+  VUByte -> 1
+  VByteNormalized -> 1
+  VUByteNormalized -> 1
+  VShort -> 2
+  VUShort -> 2
+  VShortNormalized -> 2
+  VUShortNormalized -> 2
+  VInt -> 4
+  VUInt -> 4
+  VIntNormalized -> 4
+  VUIntNormalized -> 4
+  VFloat -> 4
+
+isNormalized :: ComponentFormat -> Bool
+isNormalized c = case c of
+  VByte -> False
+  VUByte -> False
+  VByteNormalized -> True
+  VUByteNormalized -> True
+  VShort -> False
+  VUShort -> False
+  VShortNormalized -> True
+  VUShortNormalized -> True
+  VInt -> False
+  VUInt -> False
+  VIntNormalized -> True
+  VUIntNormalized -> True
+  VFloat -> False
 
 
 
@@ -791,29 +833,51 @@ newFramebuffer = do
   n <- alloca (\ptr -> glGenFramebuffers 1 ptr >> peek ptr)
   return (FBO n)
 
+data RBOColor = RBOColor GLuint deriving Show
+data RBODepth = RBODepth GLuint deriving Show
+data RBODepthStencil = RBODepthStencil GLuint deriving Show
 
--- | Install a color attachment for the framebuffer currently bound.
-framebufferColorAttachment :: Attachment -> IO ()
-framebufferColorAttachment att = framebufferAttachment GL_COLOR_ATTACHMENT0 att
 
--- | Install a depth attachment for the framebuffer currently bound.
-framebufferDepthAttachment :: Attachment -> IO ()
-framebufferDepthAttachment att = framebufferAttachment GL_DEPTH_ATTACHMENT att
+attachRBOColor :: RBOColor -> IO ()
+attachRBOColor (RBOColor n) = glFramebufferRenderbuffer
+  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_RENDERBUFFER n
 
--- | Install a stencil attachment for the framebuffer currently bound.
-framebufferStencilAttachment :: Attachment -> IO ()
-framebufferStencilAttachment att = framebufferAttachment GL_STENCIL_ATTACHMENT att
+attachRBODepth :: RBODepth -> IO ()
+attachRBODepth (RBODepth n) = glFramebufferRenderbuffer
+  GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_RENDERBUFFER n
 
-framebufferAttachment :: GLenum -> Attachment -> IO ()
-framebufferAttachment point attach = case attach of
-  AttachTex2D (Tex2D n) -> glFramebufferTexture2D GL_FRAMEBUFFER point GL_TEXTURE_2D n 0
-  AttachCubeLeft (CubeMap n) -> glFramebufferTexture2D GL_FRAMEBUFFER point GL_TEXTURE_CUBE_MAP_NEGATIVE_X n 0
-  AttachCubeRight (CubeMap n) -> glFramebufferTexture2D GL_FRAMEBUFFER point GL_TEXTURE_CUBE_MAP_POSITIVE_X n 0
-  AttachCubeTop (CubeMap n) -> glFramebufferTexture2D GL_FRAMEBUFFER point GL_TEXTURE_CUBE_MAP_POSITIVE_Y n 0
-  AttachCubeBottom (CubeMap n) -> glFramebufferTexture2D GL_FRAMEBUFFER point GL_TEXTURE_CUBE_MAP_NEGATIVE_Y n 0
-  AttachCubeFront (CubeMap n) -> glFramebufferTexture2D GL_FRAMEBUFFER point GL_TEXTURE_CUBE_MAP_POSITIVE_Z n 0
-  AttachCubeBack (CubeMap n) -> glFramebufferTexture2D GL_FRAMEBUFFER point GL_TEXTURE_CUBE_MAP_NEGATIVE_Z n 0
-  AttachRenderbuffer (RBO n) -> glFramebufferRenderbuffer GL_FRAMEBUFFER point GL_RENDERBUFFER n
+attachRBODepthStencil :: RBODepthStencil -> IO ()
+attachRBODepthStencil (RBODepthStencil n) = glFramebufferRenderbuffer
+  GL_FRAMEBUFFER GL_DEPTH_STENCIL_ATTACHMENT GL_RENDERBUFFER n
+
+attachTex2DColor :: Tex2D -> IO ()
+attachTex2DColor (Tex2D n) = glFramebufferTexture2D
+  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D n 0
+
+
+attachCubeLeftColor :: CubeMap -> IO ()
+attachCubeLeftColor (CubeMap n) = glFramebufferTexture2D
+  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_NEGATIVE_X n 0
+
+attachCubeRightColor :: CubeMap -> IO ()
+attachCubeRightColor (CubeMap n) = glFramebufferTexture2D
+  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_POSITIVE_X n 0
+
+attachCubeTopColor :: CubeMap -> IO ()
+attachCubeTopColor (CubeMap n) = glFramebufferTexture2D
+  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_POSITIVE_Y n 0
+
+attachCubeBottomColor :: CubeMap -> IO ()
+attachCubeBottomColor (CubeMap n) = glFramebufferTexture2D
+  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_NEGATIVE_Y n 0
+
+attachCubeFrontColor :: CubeMap -> IO ()
+attachCubeFrontColor (CubeMap n) = glFramebufferTexture2D
+  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_POSITIVE_Z n 0
+
+attachCubeBackColor :: CubeMap -> IO ()
+attachCubeBackColor (CubeMap n) = glFramebufferTexture2D
+  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_NEGATIVE_Z n 0
 
 -- | Have rendering commands output to the desired framebuffer. Assigns
 -- framebuffer object to framebuffer binding target.
@@ -824,34 +888,28 @@ bindFramebuffer (FBO n) = glBindFramebuffer GL_FRAMEBUFFER n
 defaultFBO :: FBO
 defaultFBO = FBO 0
 
-sizeOfVertexComponent :: ComponentFormat -> Int
-sizeOfVertexComponent c = case c of
-  VByte -> 1
-  VUByte -> 1
-  VByteNormalized -> 1
-  VUByteNormalized -> 1
-  VShort -> 2
-  VUShort -> 2
-  VShortNormalized -> 2
-  VUShortNormalized -> 2
-  VInt -> 4
-  VUInt -> 4
-  VIntNormalized -> 4
-  VUIntNormalized -> 4
-  VFloat -> 4
+-- | Create a new 24-bit color renderbuffer with the specified dimensions.
+newRBOColor :: Int -> Int -> IO RBOColor
+newRBOColor w h = RBOColor <$> newRBO GL_RGB8 w h
 
-isNormalized :: ComponentFormat -> Bool
-isNormalized c = case c of
-  VByte -> False
-  VUByte -> False
-  VByteNormalized -> True
-  VUByteNormalized -> True
-  VShort -> False
-  VUShort -> False
-  VShortNormalized -> True
-  VUShortNormalized -> True
-  VInt -> False
-  VUInt -> False
-  VIntNormalized -> True
-  VUIntNormalized -> True
-  VFloat -> False
+-- | Create a new renderbuffer with 24-bit depth component with the specified
+-- dimensions.
+newRBODepth :: Int -> Int -> IO RBODepth
+newRBODepth w h = RBODepth <$> newRBO GL_DEPTH_COMPONENT24 w h
+
+-- | Create a new renderbuffer with 24-bit depth component and 8-bit stencil
+-- with the specified dimensions.
+newRBODepthStencil :: Int -> Int -> IO RBODepthStencil
+newRBODepthStencil w h = RBODepthStencil <$> newRBO GL_DEPTH24_STENCIL8 w h
+
+newRBO :: GLenum -> Int -> Int -> IO GLuint
+newRBO internal w h = do
+  n <- alloca (\ptr -> glGenRenderbuffers 1 ptr >> peek ptr)
+  glBindRenderbuffer GL_RENDERBUFFER n
+  glRenderbufferStorage
+    GL_RENDERBUFFER
+    internal
+    (fromIntegral w)
+    (fromIntegral h)
+  return n
+
