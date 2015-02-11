@@ -70,7 +70,7 @@ module Graphics.GL.Low (
   -- * Textures
   Tex2D,
   CubeMap,
-  ImageFormat(..),
+  Dimensions(..),
   Cube(..),
   Side,
   newTexture2D,
@@ -144,7 +144,12 @@ module Graphics.GL.Low (
   disableCulling,
 
   -- ** Blending
-
+  BlendFactor(..),
+  BlendEquation(..),
+  enableBlending,
+  disableBlending,
+  setBlendFactors,
+  setBlendEquation,
 
   -- ** Viewport
   Viewport(..),
@@ -153,24 +158,24 @@ module Graphics.GL.Low (
   -- * Framebuffers
   FBO,
   defaultFBO,
-  newFramebuffer,
   bindFramebuffer,
+  newFramebuffer,
   attachTex2D,
   attachCubeMap,
   attachRBO,
 
   -- * Renderbuffers
-  -- | RBOs, along with textures, are one of two kinds of rendering
-  -- destinations that can be attached to a framebuffer. If you need a depth
-  -- buffer for rendering but don't need the final depth results then use
-  -- an RBODepth or RBODepthStencil attachment. If you don't need the color
-  -- results then you can attach an RBOColor instead of a texture to make an
-  -- FBO complete. If you plan on using any rendering results in a shader as a
-  -- second pass, then you need to use a texture instead.
-  --
-  -- The only thing you can do with an RBO is attach it to an FBO.
   RBO,
   newRBO,
+
+  -- * Image Formats
+  Alpha,
+  Luminance,
+  LuminanceAlpha,
+  RGB,
+  RGBA,
+  Depth24,
+  Depth24Stencil8,
 
   -- * Classes
   InternalFormat(..),
@@ -194,6 +199,7 @@ import Data.Functor
 import Control.Applicative
 import Data.Traversable
 import Data.Foldable
+import Data.Default
 
 import Linear
 import Graphics.GL
@@ -232,6 +238,10 @@ newtype CubeMap a = CubeMap GLuint deriving Show
 -- object or a renderbuffer object. Rendering commands output graphics to the
 -- attachments of the FBO currently bound to the framebuffer binding target.
 newtype FBO = FBO GLuint deriving Show
+
+instance Default FBO where
+  def = FBO 0
+
 
 -- | Texture filtering modes.
 data Filtering =
@@ -284,7 +294,7 @@ type VertexAttributeLayout = [LayoutElement]
 -- integral components will be mapped to ints in the shader program.
 data ComponentFormat =
   VFloat | -- ^ 4-byte float
-  VByte |
+  VByte | 
   VUByte | 
   VByteNormalized | 
   VUByteNormalized |
@@ -326,6 +336,7 @@ instance ToGL IndexFormat where
   toGL UShortIndices = GL_UNSIGNED_SHORT
   toGL UIntIndices   = GL_UNSIGNED_INT
 
+-- | Usage hint for allocation of buffer object storage.
 data UsageHint = StaticDraw  -- ^ Data will seldomly change.
                | DynamicDraw -- ^ Data will change.
                | StreamDraw  -- ^ Data will change very often.
@@ -336,40 +347,34 @@ instance ToGL UsageHint where
   toGL StaticDraw  = GL_STATIC_DRAW
   toGL DynamicDraw = GL_DYNAMIC_DRAW
 
+-- | RGBA color quad.
 data Color = Color !Float !Float !Float !Float deriving Show
 
-{-
-data PixelFormat =
-  Alpha          | -- ^ 1-byte alpha channel only.
-  Luminance      | -- ^ 1-byte grayscale pixels.
-  LuminanceAlpha | -- ^ 2-byte luminance and alpha channel.
-  RGB            | -- ^ 3-byte true color pixels.
-  RGBA             -- ^ 4-byte true color pixels with alpha channel.
-    deriving (Eq, Show)
 
-instance ToGL PixelFormat where
-  toGL Alpha = GL_ALPHA
-  toGL Luminance = GL_LUMINANCE
-  toGL LuminanceAlpha = GL_LUMINANCE_ALPHA
-  toGL RGB = GL_RGB
-  toGL RGBA = GL_RGBA
--}
-
-
+-- | 1-byte alpha channel only.
 data Alpha = Alpha deriving Show
+
+-- | 1-byte grayscale pixel format.
 data Luminance = Luminance deriving Show
+
+-- | 2-byte luminance and alpha channel format.
 data LuminanceAlpha = Luminancealpha deriving Show
+
+-- | 3-byte true color pixel format.
 data RGB = RGB deriving Show
+
+-- | 4-byte true color plus alpha channel format.
 data RGBA = RGBA deriving Show
+
+-- | 24-bit depth format.
 data Depth24 = Depth24 deriving Show
+
+-- | Combination depth and stencil format.
 data Depth24Stencil8 = Depth24Stencil8 deriving Show
 
+-- | OpenGL internal image formats.
 class InternalFormat a where
   internalFormat :: (Eq b, Num b) => proxy a -> b
-instance InternalFormat Depth24 where
-  internalFormat _ = GL_DEPTH_COMPONENT24
-instance InternalFormat Depth24Stencil8 where
-  internalFormat _ = GL_DEPTH24_STENCIL8
 instance InternalFormat RGB where
   internalFormat _ = GL_RGB8
 instance InternalFormat RGBA where
@@ -380,8 +385,13 @@ instance InternalFormat Luminance where
   internalFormat _ = GL_LUMINANCE
 instance InternalFormat LuminanceAlpha where
   internalFormat _ = GL_LUMINANCE_ALPHA
+instance InternalFormat Depth24 where
+  internalFormat _ = GL_DEPTH_COMPONENT24
+instance InternalFormat Depth24Stencil8 where
+  internalFormat _ = GL_DEPTH24_STENCIL8
 
-class Attachable a where
+-- | The allowed attachment point for images with an internal format.
+class InternalFormat a => Attachable a where
   attachPoint :: (Eq b, Num b) => proxy a -> b
 instance Attachable RGB where
   attachPoint _ = GL_COLOR_ATTACHMENT0
@@ -398,9 +408,11 @@ instance Attachable Depth24 where
 instance Attachable Depth24Stencil8 where
   attachPoint _ = GL_DEPTH_STENCIL_ATTACHMENT
 
+-- | An RBO is a kind of image object used for rendering. The only thing
+-- you can do with an RBO is attach it to an FBO.
 data RBO a = RBO { unRBO :: GLuint } deriving Show
 
--- | A section of the window.
+-- | A rectangular section of the window.
 data Viewport = Viewport
   { viewportX :: Int
   , viewportY :: Int
@@ -408,8 +420,8 @@ data Viewport = Viewport
   , viewportH :: Int }
     deriving (Eq, Show)
 
--- | The size of an image in pixels and the format of the packed pixels.
-data ImageFormat a = ImageFormat
+-- | The size of an image in pixels, parameterized by an image format type.
+data Dimensions = Dimensions
   { imageWidth :: Int
   , imageHeight :: Int }
     deriving (Show)
@@ -432,8 +444,8 @@ instance Applicative Cube where
   pure x = Cube x x x x x x
   (Cube f1 f2 f3 f4 f5 f6) <*> (Cube x1 x2 x3 x4 x5 x6) =
     Cube (f1 x1) (f2 x2) (f3 x3) (f4 x4) (f5 x5) (f6 x6)
-  
 
+-- | Either a vertex shader or a fragment shader.
 data ShaderType = VertexShader | FragmentShader deriving Show
 
 instance ToGL ShaderType where
@@ -452,6 +464,28 @@ instance Exception ProgramError
 
 class ToGL a where
   toGL :: (Num b, Eq b) => a -> b
+
+
+-- | Blending functions for alpha blending.
+data BlendEquation =
+  FuncAdd | -- ^ the default
+  FuncSubtract |
+  FuncReverseSubtract
+    deriving Show
+
+instance Default BlendEquation where
+  def = FuncAdd
+
+-- | Blending factors.
+data BlendFactor =
+  BlendOne |
+  BlendZero |
+  BlendSourceAlpha |
+  BlendOneMinusSourceAlpha
+    deriving Show
+
+
+
 
 -- | Create a new VAO. The only thing you can do with a VAO is bind it to
 -- the vertex array binding target.
@@ -491,9 +525,10 @@ updateVBO src offset = do
     (fromIntegral len)
     (castPtr ptr)
 
+-- | Bind a VBO to the array buffer binding target. The buffer object bound
+-- there will be replaced, if any.
 bindVBO :: VBO -> IO ()
 bindVBO (VBO n _) = glBindBuffer GL_ARRAY_BUFFER n
-
 
 
 -- | Pack a list of indices into a new buffer object. The usage argument
@@ -521,7 +556,6 @@ updateElementArray xs fmt offset = marshalIndexes xs fmt $ \len ptr -> do
     (fromIntegral len)
     (castPtr ptr)
 
--- | internal
 marshalIndexes :: [Int] -> IndexFormat -> (Int -> Ptr Word8 -> IO a) -> IO a
 marshalIndexes xs fmt act = case fmt of
   UByteIndices  -> withArrayLen (map fromIntegral xs :: [Word8]) act
@@ -573,7 +607,6 @@ newProgram vcode fcode = do
 useProgram :: Program -> IO ()
 useProgram (Program n) = glUseProgram n
 
--- | internal
 compileShader :: String -> ShaderType -> IO GLuint
 compileShader code vertOrFrag = do
   shaderId <- glCreateShader (toGL vertOrFrag)
@@ -656,7 +689,6 @@ isNormalized c = case c of
   VIntNormalized -> True
   VUIntNormalized -> True
   VFloat -> False
-
 
 
 setUniform1f :: Program -> String -> [Float] -> IO ()
@@ -760,48 +792,48 @@ drawIndexedTriangleFan = drawIndexed GL_TRIANGLE_FAN
 drawIndexed :: GLenum -> Int -> IndexFormat -> IO ()
 drawIndexed mode n fmt = glDrawElements mode (fromIntegral n) (toGL fmt) nullPtr
 
--- | Create a new 2D texture from a blob, given its dimensions and pixel format.
+-- | Create a new 2D texture from a blob and its image format.
 -- Dimensions should be powers of two.
-newTexture2D :: InternalFormat a => Vector Word8 -> ImageFormat a -> IO (Tex2D a)
-newTexture2D bytes fmt@(ImageFormat w h)  = do
+newTexture2D :: InternalFormat a => Vector Word8 -> Dimensions -> IO (Tex2D a)
+newTexture2D bytes (Dimensions w h)  = do
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_2D n
+  tex <- return (Tex2D n)
   unsafeWith bytes $ \ptr -> glTexImage2D
     GL_TEXTURE_2D
     0
-    (internalFormat fmt)
+    (internalFormat tex)
     (fromIntegral w)
     (fromIntegral h)
     0
-    (internalFormat fmt)
+    (internalFormat tex)
     GL_UNSIGNED_BYTE
     (castPtr ptr)
-  return (Tex2D n)
+  return tex
 
 -- | Create a new cube map texture from six blobs and their respective formats.
 -- Dimensions should be powers of two.
 newCubeMap :: InternalFormat a
-           => Cube (Vector Word8, ImageFormat a)
+           => Cube (Vector Word8, Dimensions)
            -> IO (CubeMap a)
 newCubeMap images = do
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_CUBE_MAP n
-  sequenceA $ liftA2 loadCubeMapSide images cubeSideCodes
-  return (CubeMap n)
+  cm <- return (CubeMap n)
+  let fmt = internalFormat cm
+  sequenceA (liftA2 (loadCubeMapSide fmt) images cubeSideCodes)
+  return cm
   
-loadCubeMapSide :: InternalFormat a
-                => (Vector Word8, ImageFormat a)
-                -> GLenum
-                -> IO ()
-loadCubeMapSide (bytes, fmt@(ImageFormat w h)) side = do
+loadCubeMapSide :: GLenum -> (Vector Word8, Dimensions) -> GLenum -> IO ()
+loadCubeMapSide fmt (bytes, (Dimensions w h)) side = do
   unsafeWith bytes $ \ptr -> glTexImage2D
     side
     0
-    (internalFormat fmt)
+    (fromIntegral fmt)
     (fromIntegral w)
     (fromIntegral h)
     0
-    (internalFormat fmt)
+    fmt
     GL_UNSIGNED_BYTE
     (castPtr ptr)
 
@@ -890,6 +922,7 @@ setCubeMapWrapping wrap = do
 enableColorWriting :: IO ()
 enableColorWriting = glColorMask GL_TRUE GL_TRUE GL_TRUE GL_TRUE
 
+-- | Disable rendering to color buffer.
 disableColorWriting :: IO ()
 disableColorWriting = glColorMask GL_FALSE GL_FALSE GL_FALSE GL_FALSE
 
@@ -923,7 +956,9 @@ disableDepthWriting = glDepthMask GL_FALSE
 clearDepthBuffer :: IO ()
 clearDepthBuffer = glClear GL_DEPTH_BUFFER_BIT
 
-
+-- | Enable the stencil test. Any pixels rendered to the screen where the
+-- stencil buffer is 1 will not be rendered. This disables writing to the
+-- stencil buffer.
 enableStencilTest :: IO ()
 enableStencilTest = do
   glStencilFunc GL_LESS 1 maxBound
@@ -938,12 +973,15 @@ disableStencilTest = glDisable GL_STENCIL_TEST
 clearStencilBuffer :: IO ()
 clearStencilBuffer = glClear GL_STENCIL_BUFFER_BIT
 
+-- | Allow rendering to modify the stencil buffer. Any pixels rendered to
+-- the screen will set the stencil buffer to 1 at that location.
 enableStencilWriting :: IO ()
 enableStencilWriting = do
   glStencilFunc GL_ALWAYS 1 maxBound
   glStencilOp GL_KEEP GL_KEEP GL_REPLACE
   glStencilMask 1
 
+-- | Disable rendering to the stencil buffer.
 disableStencilWriting :: IO ()
 disableStencilWriting = glStencilMask 0
 
@@ -980,36 +1018,35 @@ enableCulling c = do
 disableCulling :: IO ()
 disableCulling = glDisable GL_CULL_FACE
 
--- viewport
+-- | Set the viewport.
 setViewport :: Viewport -> IO ()
 setViewport (Viewport x y w h) =
   glViewport (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
 
--- | Create a framebuffer object. Before the framebuffer can be used for
--- rendering it must have a color attachment texture and that texture must
--- have been initialized with storage.
-newFramebuffer :: IO FBO
-newFramebuffer = do
-  n <- alloca (\ptr -> glGenFramebuffers 1 ptr >> peek ptr)
-  return (FBO n)
+-- | The default framebuffer object. Bind this to render to the screen as usual.
+defaultFBO :: FBO
+defaultFBO = def
 
 -- | Binds an FBO to the framebuffer binding target. Replaces the FBO
 -- already bound there.
 bindFramebuffer :: FBO -> IO ()
 bindFramebuffer (FBO n) = glBindFramebuffer GL_FRAMEBUFFER n
 
--- | The default framebuffer object. Bind this to render normally.
-defaultFBO :: FBO
-defaultFBO = FBO 0
+-- | Create a new framebuffer object. Before the framebuffer can be used for
+-- rendering it must have a color image attachment.
+newFramebuffer :: IO FBO
+newFramebuffer = do
+  n <- alloca (\ptr -> glGenFramebuffers 1 ptr >> peek ptr)
+  return (FBO n)
 
--- | Attach a 2D texture to the FBO currently bound to the framebuffer
--- binding target.
+-- | Attach a 2D texture to the FBO currently bound to the
+-- framebuffer binding target.
 attachTex2D :: Attachable a => Tex2D a -> IO ()
 attachTex2D t@(Tex2D n) =
   glFramebufferTexture2D GL_FRAMEBUFFER (attachPoint t) GL_TEXTURE_2D n 0
 
--- | Attach a cubemap texture to the FBO currently bound to the framebuffer
--- binding target. 
+-- | Attach one of the sides of a cubemap texture to the FBO currently bound
+-- to the framebuffer binding target.
 attachCubeMap :: Attachable a => CubeMap a -> Side -> IO ()
 attachCubeMap cm@(CubeMap n) side =
   glFramebufferTexture2D
@@ -1046,3 +1083,21 @@ newRBO w h = do
     (fromIntegral w)
     (fromIntegral h)
   return rbo
+
+
+
+-- | Enable alpha blending.
+enableBlending :: IO ()
+enableBlending = return ()
+
+-- | Disable alpha blending.
+disableBlending :: IO ()
+disableBlending = return ()
+
+-- | Set the computation for source and destination blending factors.
+setBlendFactors :: BlendFactor -> BlendFactor -> IO ()
+setBlendFactors s d = return ()
+
+-- | Set the overall blending function.
+setBlendEquation :: BlendEquation -> IO ()
+setBlendEquation e = return ()
