@@ -1,4 +1,9 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE Rank2Types #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 module Graphics.GL.Low (
   -- * VAO
   VAO,
@@ -66,8 +71,8 @@ module Graphics.GL.Low (
   Tex2D,
   CubeMap,
   ImageFormat(..),
-  PixelFormat(..),
   Cube(..),
+  Side,
   newTexture2D,
   newCubeMap,
   newEmptyTexture2D,
@@ -150,27 +155,30 @@ module Graphics.GL.Low (
   defaultFBO,
   newFramebuffer,
   bindFramebuffer,
-  attachTex2DColor,
-  attachCubeLeftColor,
-  attachCubeRightColor,
-  attachCubeTopColor,
-  attachCubeBottomColor,
-  attachCubeFrontColor,
-  attachCubeBackColor,
-  attachRBOColor,
-  attachRBODepth,
-  attachRBODepthStencil,
+  attachTex2D,
+  attachCubeMap,
+  attachRBO,
 
   -- * Renderbuffers
-  RBOColor,
-  RBODepth,
-  RBODepthStencil,
-  newRBOColor,
-  newRBODepth,
-  newRBODepthStencil
+  -- | RBOs, along with textures, are one of two kinds of rendering
+  -- destinations that can be attached to a framebuffer. If you need a depth
+  -- buffer for rendering but don't need the final depth results then use
+  -- an RBODepth or RBODepthStencil attachment. If you don't need the color
+  -- results then you can attach an RBOColor instead of a texture to make an
+  -- FBO complete. If you plan on using any rendering results in a shader as a
+  -- second pass, then you need to use a texture instead.
+  --
+  -- The only thing you can do with an RBO is attach it to an FBO.
+  RBO,
+  newRBO,
+
+  -- * Classes
+  InternalFormat(..),
+  Attachable(..),
 
 ) where
 
+import Prelude hiding (sum)
 import Control.Exception
 import Data.Typeable
 import Foreign.Ptr
@@ -179,10 +187,13 @@ import Foreign.Marshal
 import Foreign.C.String
 import Data.Vector.Storable (Vector, unsafeWith)
 import qualified Data.Vector.Storable as V (length)
-import Control.Monad
+import Control.Monad hiding (forM_)
 import Data.Word
 import Data.Int
 import Data.Functor
+import Control.Applicative
+import Data.Traversable
+import Data.Foldable
 
 import Linear
 import Graphics.GL
@@ -210,11 +221,11 @@ data ElementArray = ElementArray GLuint Int IndexFormat deriving Show
 
 -- | A 2D texture. A program can sample a texture if it has been bound to
 -- the appropriate texture unit.
-newtype Tex2D = Tex2D GLuint deriving Show
+newtype Tex2D a = Tex2D GLuint deriving Show
 
 -- | A cubemap texture is just six 2D textures. A program can sample a cubemap
 -- texture if it has been bound to the appropriate texture unit.
-newtype CubeMap = CubeMap GLuint deriving Show
+newtype CubeMap a = CubeMap GLuint deriving Show
 
 -- | A framebuffer object contains up to three attachments: a color buffer,
 -- a depth buffer, and a stencil buffer. Each attachment may be a texture
@@ -327,6 +338,7 @@ instance ToGL UsageHint where
 
 data Color = Color !Float !Float !Float !Float deriving Show
 
+{-
 data PixelFormat =
   Alpha          | -- ^ 1-byte alpha channel only.
   Luminance      | -- ^ 1-byte grayscale pixels.
@@ -341,6 +353,52 @@ instance ToGL PixelFormat where
   toGL LuminanceAlpha = GL_LUMINANCE_ALPHA
   toGL RGB = GL_RGB
   toGL RGBA = GL_RGBA
+-}
+
+
+data Alpha = Alpha deriving Show
+data Luminance = Luminance deriving Show
+data LuminanceAlpha = Luminancealpha deriving Show
+data RGB = RGB deriving Show
+data RGBA = RGBA deriving Show
+data Depth24 = Depth24 deriving Show
+data Depth24Stencil8 = Depth24Stencil8 deriving Show
+
+class InternalFormat a where
+  internalFormat :: (Eq b, Num b) => proxy a -> b
+instance InternalFormat Depth24 where
+  internalFormat _ = GL_DEPTH_COMPONENT24
+instance InternalFormat Depth24Stencil8 where
+  internalFormat _ = GL_DEPTH24_STENCIL8
+instance InternalFormat RGB where
+  internalFormat _ = GL_RGB8
+instance InternalFormat RGBA where
+  internalFormat _ = GL_RGBA
+instance InternalFormat Alpha where
+  internalFormat _ = GL_ALPHA
+instance InternalFormat Luminance where
+  internalFormat _ = GL_LUMINANCE
+instance InternalFormat LuminanceAlpha where
+  internalFormat _ = GL_LUMINANCE_ALPHA
+
+class Attachable a where
+  attachPoint :: (Eq b, Num b) => proxy a -> b
+instance Attachable RGB where
+  attachPoint _ = GL_COLOR_ATTACHMENT0
+instance Attachable RGBA where
+  attachPoint _ = GL_COLOR_ATTACHMENT0
+instance Attachable Luminance where
+  attachPoint _ = GL_COLOR_ATTACHMENT0
+instance Attachable LuminanceAlpha where
+  attachPoint _ = GL_COLOR_ATTACHMENT0
+instance Attachable Alpha where
+  attachPoint _ = GL_COLOR_ATTACHMENT0
+instance Attachable Depth24 where
+  attachPoint _ = GL_DEPTH_ATTACHMENT
+instance Attachable Depth24Stencil8 where
+  attachPoint _ = GL_DEPTH_STENCIL_ATTACHMENT
+
+data RBO a = RBO { unRBO :: GLuint } deriving Show
 
 -- | A section of the window.
 data Viewport = Viewport
@@ -351,23 +409,30 @@ data Viewport = Viewport
     deriving (Eq, Show)
 
 -- | The size of an image in pixels and the format of the packed pixels.
-data ImageFormat = ImageFormat
+data ImageFormat a = ImageFormat
   { imageWidth :: Int
-  , imageHeight :: Int
-  , imageFormat :: PixelFormat }
+  , imageHeight :: Int }
     deriving (Show)
 
--- | Six values.
+-- | Six values, one on each side.
 data Cube a = Cube
   { cubeRight  :: a
   , cubeLeft   :: a
   , cubeTop    :: a
   , cubeBottom :: a
   , cubeFront  :: a
-  , cubeBack   :: a } deriving Show
+  , cubeBack   :: a }
+    deriving (Show, Functor, Foldable, Traversable)
 
-instance Functor Cube where
-  fmap f (Cube x y u v s t) = Cube (f x) (f y) (f u) (f v) (f s) (f y)
+-- | A type to pick one of the sides of a cube. See the accessors of the
+-- type 'Cube'.
+type Side = forall a . Cube a -> a
+
+instance Applicative Cube where
+  pure x = Cube x x x x x x
+  (Cube f1 f2 f3 f4 f5 f6) <*> (Cube x1 x2 x3 x4 x5 x6) =
+    Cube (f1 x1) (f2 x2) (f3 x3) (f4 x4) (f5 x5) (f6 x6)
+  
 
 data ShaderType = VertexShader | FragmentShader deriving Show
 
@@ -697,88 +762,90 @@ drawIndexed mode n fmt = glDrawElements mode (fromIntegral n) (toGL fmt) nullPtr
 
 -- | Create a new 2D texture from a blob, given its dimensions and pixel format.
 -- Dimensions should be powers of two.
-newTexture2D :: Vector Word8 -> ImageFormat -> IO Tex2D
-newTexture2D bytes (ImageFormat w h pixfmt)  = do
+newTexture2D :: InternalFormat a => Vector Word8 -> ImageFormat a -> IO (Tex2D a)
+newTexture2D bytes fmt@(ImageFormat w h)  = do
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_2D n
   unsafeWith bytes $ \ptr -> glTexImage2D
     GL_TEXTURE_2D
     0
-    (toGL pixfmt)
+    (internalFormat fmt)
     (fromIntegral w)
     (fromIntegral h)
     0
-    (toGL pixfmt)
+    (internalFormat fmt)
     GL_UNSIGNED_BYTE
     (castPtr ptr)
   return (Tex2D n)
 
 -- | Create a new cube map texture from six blobs and their respective formats.
 -- Dimensions should be powers of two.
-newCubeMap :: Cube (Vector Word8, ImageFormat) -> IO CubeMap
-newCubeMap (Cube s1 s2 s3 s4 s5 s6) = do
+newCubeMap :: InternalFormat a
+           => Cube (Vector Word8, ImageFormat a)
+           -> IO (CubeMap a)
+newCubeMap images = do
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_CUBE_MAP n
-  loadCubeMapSide s1 GL_TEXTURE_CUBE_MAP_POSITIVE_X
-  loadCubeMapSide s2 GL_TEXTURE_CUBE_MAP_NEGATIVE_X
-  loadCubeMapSide s3 GL_TEXTURE_CUBE_MAP_POSITIVE_Y
-  loadCubeMapSide s4 GL_TEXTURE_CUBE_MAP_NEGATIVE_Y
-  loadCubeMapSide s5 GL_TEXTURE_CUBE_MAP_POSITIVE_Z
-  loadCubeMapSide s6 GL_TEXTURE_CUBE_MAP_NEGATIVE_Z
+  sequenceA $ liftA2 loadCubeMapSide images cubeSideCodes
   return (CubeMap n)
   
-loadCubeMapSide :: (Vector Word8, ImageFormat) -> GLenum -> IO ()
-loadCubeMapSide (bytes, ImageFormat w h pixfmt) side = do
+loadCubeMapSide :: InternalFormat a
+                => (Vector Word8, ImageFormat a)
+                -> GLenum
+                -> IO ()
+loadCubeMapSide (bytes, fmt@(ImageFormat w h)) side = do
   unsafeWith bytes $ \ptr -> glTexImage2D
     side
     0
-    (toGL pixfmt)
+    (internalFormat fmt)
     (fromIntegral w)
     (fromIntegral h)
     0
-    (toGL pixfmt)
+    (internalFormat fmt)
     GL_UNSIGNED_BYTE
     (castPtr ptr)
 
 -- | Create an empty texture with the specified dimensions and format.
-newEmptyTexture2D :: Int -> Int -> PixelFormat -> IO Tex2D
-newEmptyTexture2D w h fmt = do
+newEmptyTexture2D :: InternalFormat a => Int -> Int -> IO (Tex2D a)
+newEmptyTexture2D w h = do
   let w' = fromIntegral w
   let h' = fromIntegral h
-  let fmt' = toGL fmt
-  let fmt'' = toGL fmt
-  tex <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
-  glBindTexture GL_TEXTURE_2D tex
-  glTexImage2D GL_TEXTURE_2D 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
-  return (Tex2D tex)
+  n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
+  tex <- return (Tex2D n)
+  let fmt = internalFormat tex
+  let fmt' = internalFormat tex
+  glBindTexture GL_TEXTURE_2D n
+  glTexImage2D GL_TEXTURE_2D 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
+  return tex
 
 -- | Create a cubemap texture where each of the six sides has the specified
 -- dimensions and format.
-newEmptyCubeMap :: Int -> Int -> PixelFormat -> IO CubeMap
-newEmptyCubeMap w h fmt = do
+newEmptyCubeMap :: InternalFormat a => Int -> Int -> IO (CubeMap a)
+newEmptyCubeMap w h = do
   let w' = fromIntegral w
   let h' = fromIntegral h
-  let fmt' = toGL fmt
-  let fmt'' = toGL fmt
-  tex <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
-  glBindTexture GL_TEXTURE_CUBE_MAP tex
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_X 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Y 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
-  return (CubeMap tex)
+  n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
+  tex <- return (CubeMap n)
+  let fmt = internalFormat tex
+  let fmt' = internalFormat tex
+  glBindTexture GL_TEXTURE_CUBE_MAP n
+  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_X 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Y 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
+  return tex
   
 
 -- | Bind a 2D texture to the 2D texture binding target and the currently
 -- active texture unit.
-bindTexture2D :: Tex2D -> IO ()
+bindTexture2D :: Tex2D a -> IO ()
 bindTexture2D (Tex2D n) = glBindTexture GL_TEXTURE_2D n
 
 -- | Bind a cubemap texture to the cubemap texture binding target and
 -- the currently active texture unit.
-bindTextureCubeMap :: CubeMap -> IO ()
+bindTextureCubeMap :: CubeMap a -> IO ()
 bindTextureCubeMap (CubeMap n) = glBindTexture GL_TEXTURE_CUBE_MAP n
 
 -- | Set the active texture unit. The default is zero.
@@ -926,54 +993,8 @@ newFramebuffer = do
   n <- alloca (\ptr -> glGenFramebuffers 1 ptr >> peek ptr)
   return (FBO n)
 
-data RBOColor = RBOColor GLuint deriving Show
-data RBODepth = RBODepth GLuint deriving Show
-data RBODepthStencil = RBODepthStencil GLuint deriving Show
-
-
-attachRBOColor :: RBOColor -> IO ()
-attachRBOColor (RBOColor n) = glFramebufferRenderbuffer
-  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_RENDERBUFFER n
-
-attachRBODepth :: RBODepth -> IO ()
-attachRBODepth (RBODepth n) = glFramebufferRenderbuffer
-  GL_FRAMEBUFFER GL_DEPTH_ATTACHMENT GL_RENDERBUFFER n
-
-attachRBODepthStencil :: RBODepthStencil -> IO ()
-attachRBODepthStencil (RBODepthStencil n) = glFramebufferRenderbuffer
-  GL_FRAMEBUFFER GL_DEPTH_STENCIL_ATTACHMENT GL_RENDERBUFFER n
-
-attachTex2DColor :: Tex2D -> IO ()
-attachTex2DColor (Tex2D n) = glFramebufferTexture2D
-  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_2D n 0
-
-
-attachCubeLeftColor :: CubeMap -> IO ()
-attachCubeLeftColor (CubeMap n) = glFramebufferTexture2D
-  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_NEGATIVE_X n 0
-
-attachCubeRightColor :: CubeMap -> IO ()
-attachCubeRightColor (CubeMap n) = glFramebufferTexture2D
-  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_POSITIVE_X n 0
-
-attachCubeTopColor :: CubeMap -> IO ()
-attachCubeTopColor (CubeMap n) = glFramebufferTexture2D
-  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_POSITIVE_Y n 0
-
-attachCubeBottomColor :: CubeMap -> IO ()
-attachCubeBottomColor (CubeMap n) = glFramebufferTexture2D
-  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_NEGATIVE_Y n 0
-
-attachCubeFrontColor :: CubeMap -> IO ()
-attachCubeFrontColor (CubeMap n) = glFramebufferTexture2D
-  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_POSITIVE_Z n 0
-
-attachCubeBackColor :: CubeMap -> IO ()
-attachCubeBackColor (CubeMap n) = glFramebufferTexture2D
-  GL_FRAMEBUFFER GL_COLOR_ATTACHMENT0 GL_TEXTURE_CUBE_MAP_NEGATIVE_Z n 0
-
--- | Have rendering commands output to the desired framebuffer. Assigns
--- framebuffer object to framebuffer binding target.
+-- | Binds an FBO to the framebuffer binding target. Replaces the FBO
+-- already bound there.
 bindFramebuffer :: FBO -> IO ()
 bindFramebuffer (FBO n) = glBindFramebuffer GL_FRAMEBUFFER n
 
@@ -981,28 +1002,47 @@ bindFramebuffer (FBO n) = glBindFramebuffer GL_FRAMEBUFFER n
 defaultFBO :: FBO
 defaultFBO = FBO 0
 
--- | Create a new 24-bit color renderbuffer with the specified dimensions.
-newRBOColor :: Int -> Int -> IO RBOColor
-newRBOColor w h = RBOColor <$> newRBO GL_RGB8 w h
+-- | Attach a 2D texture to the FBO currently bound to the framebuffer
+-- binding target.
+attachTex2D :: Attachable a => Tex2D a -> IO ()
+attachTex2D t@(Tex2D n) =
+  glFramebufferTexture2D GL_FRAMEBUFFER (attachPoint t) GL_TEXTURE_2D n 0
 
--- | Create a new renderbuffer with 24-bit depth component with the specified
--- dimensions.
-newRBODepth :: Int -> Int -> IO RBODepth
-newRBODepth w h = RBODepth <$> newRBO GL_DEPTH_COMPONENT24 w h
+-- | Attach a cubemap texture to the FBO currently bound to the framebuffer
+-- binding target. 
+attachCubeMap :: Attachable a => CubeMap a -> Side -> IO ()
+attachCubeMap cm@(CubeMap n) side =
+  glFramebufferTexture2D
+    GL_FRAMEBUFFER
+    (attachPoint cm)
+    (side cubeSideCodes)
+    n
+    0
 
--- | Create a new renderbuffer with 24-bit depth component and 8-bit stencil
--- with the specified dimensions.
-newRBODepthStencil :: Int -> Int -> IO RBODepthStencil
-newRBODepthStencil w h = RBODepthStencil <$> newRBO GL_DEPTH24_STENCIL8 w h
+cubeSideCodes :: Cube GLenum
+cubeSideCodes = Cube
+  { cubeLeft   = GL_TEXTURE_CUBE_MAP_NEGATIVE_X
+  , cubeRight  = GL_TEXTURE_CUBE_MAP_POSITIVE_X
+  , cubeTop    = GL_TEXTURE_CUBE_MAP_POSITIVE_Y
+  , cubeBottom = GL_TEXTURE_CUBE_MAP_NEGATIVE_Y
+  , cubeFront  = GL_TEXTURE_CUBE_MAP_POSITIVE_Z
+  , cubeBack   = GL_TEXTURE_CUBE_MAP_NEGATIVE_Z }
 
-newRBO :: GLenum -> Int -> Int -> IO GLuint
-newRBO internal w h = do
+-- | Attach an RBO to the FBO currently bound to the framebuffer binding
+-- target.
+attachRBO :: Attachable a => RBO a -> IO ()
+attachRBO rbo = glFramebufferRenderbuffer
+  GL_FRAMEBUFFER (attachPoint rbo) GL_RENDERBUFFER (unRBO rbo)
+
+-- | Create a new renderbuffer with the specified dimensions.
+newRBO :: InternalFormat a => Int -> Int -> IO (RBO a)
+newRBO w h = do
   n <- alloca (\ptr -> glGenRenderbuffers 1 ptr >> peek ptr)
+  rbo <- return (RBO n)
   glBindRenderbuffer GL_RENDERBUFFER n
   glRenderbufferStorage
     GL_RENDERBUFFER
-    internal
+    (internalFormat rbo)
     (fromIntegral w)
     (fromIntegral h)
-  return n
-
+  return rbo
