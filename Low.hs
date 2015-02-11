@@ -10,15 +10,15 @@ module Graphics.GL.Low (
   VBO,
   UsageHint(..),
   newVBO,
-  updateVBO,
   bindVBO,
+  updateVBO,
 
   -- ** Element Array
   ElementArray,
   IndexFormat(..),
   newElementArray,
-  updateElementArray,
   bindElementArray,
+  updateElementArray,
 
   -- * Shader Program
   Program,
@@ -32,19 +32,32 @@ module Graphics.GL.Low (
   useProgram,
 
   -- ** Vertex Attributes
-  VertexLayout(..),
+  VertexAttributeLayout(..),
+  LayoutElement(..),
   ComponentFormat(..),
-  setVertexLayout,
+  setVertexAttributeLayout,
 
   -- ** Uniform Variables
+  --
+  -- | Set uniform variables for the current program. To set an array of
+  -- uniforms pass a list of more than one value.
+
+  -- *** Float Uniforms
+  -- | These call glUniformNfv.
   setUniform1f, 
   setUniform2f,
   setUniform3f,
   setUniform4f,
+
+  -- *** Int Uniforms
+  -- | These call glUniformNiv.
   setUniform1i,
   setUniform2i,
   setUniform3i,
   setUniform4i,
+
+  -- *** Matrix Uniforms
+  -- | These call glUniformMatrixNfv.
   setUniform22,
   setUniform33,
   setUniform44,
@@ -72,6 +85,9 @@ module Graphics.GL.Low (
   -- * Rendering
 
   -- ** Primitives
+  -- | Draw primitives to the framebuffer currently bound to the framebuffer
+  -- binding target. Each primitive drawing command takes the number of vertices
+  -- in the VBOs to render. The vertices are traversed in order.
   drawPoints,
   drawLines,
   drawLineStrip,
@@ -81,6 +97,9 @@ module Graphics.GL.Low (
   drawTriangleFan,
 
   -- ** Primitives by Index
+  -- | Draw primitives as above, but use the order of vertices defined in
+  -- the ElementArray currently bound to the element array buffer binding
+  -- target.
   drawIndexedPoints,
   drawIndexedLines,
   drawIndexedLineStrip,
@@ -98,9 +117,9 @@ module Graphics.GL.Low (
   -- ** Depth Test
   enableDepthTest,
   disableDepthTest,
+  clearDepthBuffer,
   enableDepthWriting,
   disableDepthWriting,
-  clearDepthBuffer,
 
   -- ** Stencil Test
   enableStencilTest,
@@ -165,39 +184,104 @@ import Data.Functor
 import Linear
 import Graphics.GL
 
+-- | A VAO stores vertex attribute layouts and the VBO source of vertices
+-- for those attributes. It also stores the state of the element array binding
+-- target. The vertex array binding target admits one VAO at a time.
 newtype VAO = VAO GLuint deriving Show
-newtype Program = Program GLuint deriving Show
-data VBO = VBO GLuint Int deriving Show
-data ElementArray = ElementArray GLuint Int IndexFormat deriving Show
-newtype CubeMap = CubeMap GLuint deriving Show
-newtype Tex2D = Tex2D GLuint deriving Show
-newtype FBO = FBO GLuint deriving Show
-data RBO = RBO GLuint InternalFormat deriving Show
 
-data Filtering = Nearest | Linear deriving Show
+-- | A Program object is the combination of a compiled vertex shader and fragment
+-- shader. Programs have three kinds of inputs: vertex attributes, uniforms,
+-- and samplers. Programs have two outputs: fragment color and fragment depth.
+-- At most one program can be "in use" at a time. Same idea as binding targets
+-- it's just not called that.
+newtype Program = Program GLuint deriving Show
+
+-- | A VBO is a buffer object which has vertex data. Programs use VBOs as
+-- input to their vertex attributes according to the configuration of the
+-- bound VAO.
+data VBO = VBO GLuint Int deriving Show
+
+-- | A buffer object which has a sequence of vertex indices. Indexed rendering
+-- uses the ElementArray bound to the element array binding target.
+data ElementArray = ElementArray GLuint Int IndexFormat deriving Show
+
+-- | A 2D texture. A program can sample a texture if it has been bound to
+-- the appropriate texture unit.
+newtype Tex2D = Tex2D GLuint deriving Show
+
+-- | A cubemap texture is just six 2D textures. A program can sample a cubemap
+-- texture if it has been bound to the appropriate texture unit.
+newtype CubeMap = CubeMap GLuint deriving Show
+
+-- | A framebuffer object contains up to three attachments: a color buffer,
+-- a depth buffer, and a stencil buffer. Each attachment may be a texture
+-- object or a renderbuffer object. Rendering commands output graphics to the
+-- attachments of the FBO currently bound to the framebuffer binding target.
+newtype FBO = FBO GLuint deriving Show
+
+-- | Texture filtering modes.
+data Filtering =
+  Nearest | -- ^ No interpolation.
+  Linear    -- ^ Linear interpolation.
+    deriving Show
+
 instance ToGL Filtering where
   toGL Nearest = GL_NEAREST
   toGL Linear = GL_LINEAR
 
-data Wrapping = Repeat | MirroredRepeat | ClampToEdge deriving Show
+-- | Texture wrapping modes.
+data Wrapping =
+  Repeat         | -- ^ Tile the texture past the boundary.
+  MirroredRepeat | -- ^ Tile the texture but mirror every other tile.
+  ClampToEdge      -- ^ Use the edge color for anything past the boundary.
+    deriving Show
+
 instance ToGL Wrapping where
   toGL Repeat = GL_REPEAT
   toGL MirroredRepeat = GL_MIRRORED_REPEAT
   toGL ClampToEdge = GL_CLAMP_TO_EDGE
 
-data Culling = CullFront | CullBack | CullFrontAndBack deriving Show
+-- | Facet culling modes.
+data Culling =
+  CullFront |
+  CullBack |
+  CullFrontAndBack
+    deriving Show
+
 instance ToGL Culling where
   toGL CullFront = GL_FRONT
   toGL CullBack = GL_BACK
   toGL CullFrontAndBack = GL_FRONT_AND_BACK
 
+-- | The name of a vertex input to a program combined with the
+-- component format and number of components for that attribute in the
+-- vertex data. Alternatively the size of an unused section of the data
+-- in bytes.
+data LayoutElement =
+  Attrib String Int ComponentFormat | -- ^ Name, component count and component format of a vertex attribute.
+  Unused Int -- ^ Size in bytes of an unused section of the vertex data.
+    deriving Show
 
+-- | The layout of interleaved vertex attribute data.
+type VertexAttributeLayout = [LayoutElement]
 
-
+-- | The size and interpretation of a vertex attribute component. Normalized
+-- components will be mapped to floats in the range [0, 1]. Unnormalized
+-- integral components will be mapped to ints in the shader program.
 data ComponentFormat =
-  VFloat | VByte | VUByte | VByteNormalized | VUByteNormalized |
-  VShort | VUShort | VShortNormalized | VUShortNormalized |
-  VInt | VUInt | VIntNormalized | VUIntNormalized
+  VFloat | -- ^ 4-byte float
+  VByte |
+  VUByte | 
+  VByteNormalized | 
+  VUByteNormalized |
+  VShort | -- ^ 2-byte signed integer
+  VUShort | -- ^ 2-byte unsigned integer
+  VShortNormalized |
+  VUShortNormalized |
+  VInt | -- ^ 4-byte signed integer
+  VUInt | -- ^ 4-byte unsigned integer
+  VIntNormalized |
+  VUIntNormalized
     deriving (Eq, Show)
 
 instance ToGL ComponentFormat where
@@ -216,20 +300,21 @@ instance ToGL ComponentFormat where
   toGL VUIntNormalized = GL_UNSIGNED_INT
   
 
-data VertexLayout =
-  Attrib String Int ComponentFormat |
-  Unused Int
+-- | How indices are packed in an ElementArray buffer object.
+data IndexFormat =
+  UByteIndices  |  -- ^ Each index is one unsigned byte.
+  UShortIndices |  -- ^ Each index is a two byte unsigned int.
+  UIntIndices      -- ^ Each index is a four byte unsigned int.
     deriving Show
 
-data IndexFormat = IByte | IShort | IInt deriving Show
 instance ToGL IndexFormat where
-  toGL IByte  = GL_UNSIGNED_BYTE
-  toGL IShort = GL_UNSIGNED_SHORT
-  toGL IInt   = GL_UNSIGNED_INT
+  toGL UByteIndices  = GL_UNSIGNED_BYTE
+  toGL UShortIndices = GL_UNSIGNED_SHORT
+  toGL UIntIndices   = GL_UNSIGNED_INT
 
-data UsageHint = StaticDraw  -- ^ Data will seldomly change
-               | DynamicDraw -- ^ Data will change
-               | StreamDraw  -- ^ Data will change very often
+data UsageHint = StaticDraw  -- ^ Data will seldomly change.
+               | DynamicDraw -- ^ Data will change.
+               | StreamDraw  -- ^ Data will change very often.
                  deriving Show
 
 instance ToGL UsageHint where
@@ -239,8 +324,13 @@ instance ToGL UsageHint where
 
 data Color = Color !Float !Float !Float !Float deriving Show
 
-data PixelFormat = Alpha | Luminance | LuminanceAlpha | RGB | RGBA
-  deriving (Eq, Show)
+data PixelFormat =
+  Alpha          | -- ^ 1-byte alpha channel only.
+  Luminance      | -- ^ 1-byte grayscale pixels.
+  LuminanceAlpha | -- ^ 2-byte luminance and alpha channel.
+  RGB            | -- ^ 3-byte true color pixels.
+  RGBA             -- ^ 4-byte true color pixels with alpha channel.
+    deriving (Eq, Show)
 
 instance ToGL PixelFormat where
   toGL Alpha = GL_ALPHA
@@ -249,6 +339,7 @@ instance ToGL PixelFormat where
   toGL RGB = GL_RGB
   toGL RGBA = GL_RGBA
 
+-- | A section of the window.
 data Viewport = Viewport
   { viewportX :: Int
   , viewportY :: Int
@@ -256,24 +347,14 @@ data Viewport = Viewport
   , viewportH :: Int }
     deriving (Eq, Show)
 
+-- | The size of an image in pixels and the format of the packed pixels.
 data ImageFormat = ImageFormat
   { imageWidth :: Int
   , imageHeight :: Int
   , imageFormat :: PixelFormat }
     deriving (Show)
 
--- | Internal format for renderbuffers.
-data InternalFormat =
-  RGB8 | -- ^ A 24-bit color buffer
-  DepthComponent24 | -- ^ A 24-bit depth buffer
-  Depth24Stencil8  -- ^ A combination 24-bit depth buffer and 8-bit stencil
-    deriving Show
-
-instance ToGL InternalFormat where
-  toGL RGB8 = GL_RGB8
-  toGL DepthComponent24 = GL_DEPTH_COMPONENT24
-  toGL Depth24Stencil8  = GL_DEPTH24_STENCIL8
-
+-- | Six values.
 data Cube a = Cube
   { cubeRight  :: a
   , cubeLeft   :: a
@@ -282,12 +363,17 @@ data Cube a = Cube
   , cubeFront  :: a
   , cubeBack   :: a } deriving Show
 
+instance Functor Cube where
+  fmap f (Cube x y u v s t) = Cube (f x) (f y) (f u) (f v) (f s) (f y)
+
 data ShaderType = VertexShader | FragmentShader deriving Show
 
 instance ToGL ShaderType where
   toGL VertexShader = GL_VERTEX_SHADER
   toGL FragmentShader = GL_FRAGMENT_SHADER
 
+-- | The error message emitted by the driver when shader compilation or
+-- linkage fails.
 data ProgramError =
   VertexShaderError String |
   FragmentShaderError String |
@@ -295,7 +381,6 @@ data ProgramError =
     deriving (Show, Typeable)
   
 instance Exception ProgramError
-
 
 class ToGL a where
   toGL :: (Num b, Eq b) => a -> b
@@ -328,7 +413,7 @@ newVBO src usage = do
   return (VBO n len)
 
 -- | Modify the data in the currently bound VBO starting from the specified
--- index.
+-- index in bytes.
 updateVBO :: Vector Word8 -> Int -> IO ()
 updateVBO src offset = do
   let len = V.length src
@@ -343,7 +428,7 @@ bindVBO (VBO n _) = glBindBuffer GL_ARRAY_BUFFER n
 
 
 
--- | Pack a list of indexes into a new buffer object. The usage argument
+-- | Pack a list of indices into a new buffer object. The usage argument
 -- hints at how often you plan to modify the data.
 newElementArray :: [Int] -> IndexFormat -> UsageHint -> IO ElementArray
 newElementArray xs fmt usage = do
@@ -358,7 +443,8 @@ newElementArray xs fmt usage = do
     return len
   return (ElementArray n len fmt)
   
-
+-- | Modify contents in the currently bound ElementArray starting at the
+-- specified index in bytes.
 updateElementArray :: [Int] -> IndexFormat -> Int -> IO ()
 updateElementArray xs fmt offset = marshalIndexes xs fmt $ \len ptr -> do
   glBufferSubData
@@ -370,13 +456,16 @@ updateElementArray xs fmt offset = marshalIndexes xs fmt $ \len ptr -> do
 -- | internal
 marshalIndexes :: [Int] -> IndexFormat -> (Int -> Ptr Word8 -> IO a) -> IO a
 marshalIndexes xs fmt act = case fmt of
-  IByte  -> withArrayLen (map fromIntegral xs :: [Word8]) act
-  IShort -> withArrayLen (map fromIntegral xs :: [Int16])
-              (\n ptr -> act n (castPtr ptr))
-  IInt   -> withArrayLen (map fromIntegral xs :: [Int32])
-              (\n ptr -> act n (castPtr ptr))
+  UByteIndices  -> withArrayLen (map fromIntegral xs :: [Word8]) act
+  UShortIndices -> withArrayLen (map fromIntegral xs :: [Word16])
+                     (\n ptr -> act n (castPtr ptr))
+  UIntIndices   -> withArrayLen (map fromIntegral xs :: [Word32])
+                     (\n ptr -> act n (castPtr ptr))
 
 
+-- | Assign an ElementArray to the element array binding target. It will
+-- replace the ElementArray already bound there, if any. Note that the state
+-- of the element array binding target is a function of the current VAO.
 bindElementArray :: ElementArray -> IO ()
 bindElementArray (ElementArray n _ _) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
 
@@ -386,7 +475,8 @@ newProgramSafe :: String -> String -> IO (Either ProgramError Program)
 newProgramSafe vcode fcode = try $ newProgram vcode fcode
 
 -- | Compile the code for a vertex shader and a fragment shader, then link
--- them into a new program.
+-- them into a new program. If the compiler or linker fails it will throw
+-- a ProgramError.
 newProgram :: String -- ^ vertex shader source code
            -> String -- ^ fragment shader source code
            -> IO Program
@@ -410,8 +500,8 @@ newProgram vcode fcode = do
   glDeleteShader fragmentShaderId
   return (Program programId)
 
--- | Install program into render pipeline. Replaces the program already in
--- use, if any.
+-- | Install a program into the rendering pipeline. Replaces the program
+-- already in use, if any.
 useProgram :: Program -> IO ()
 useProgram (Program n) = glUseProgram n
 
@@ -435,27 +525,11 @@ compileShader code vertOrFrag = do
       FragmentShader -> throwIO (FragmentShaderError errors)
   return shaderId
 
--- | Set the configuration of a set of vertex attributes for the current
--- program. Before using this, a program must be in use (useProgram), a VAO
--- must be bound (bindVAO), and a buffer object serving as the source for
--- vertex data must be bound to the array buffer binding target (bindArrayBuffer).
--- With those in place, executing this will associate input variables in the
--- program with certain ranges of bytes in the vertex buffer. Also the buffer
--- object itself will be set as the input for those variables. Both of these
--- will be remembered by the ambient VAO, irrespective of whether the array
--- buffer binding target is subsequently changed (contrast this with the
--- array element buffer binding target which /is/ remembered by the VAO).
--- In the list of tuples, the first component is the variable name in the
--- shader program. The second component is the number of components of the
--- attribute in the data, either 1 2 3 or 4. The third component is the format
--- of each component which implies how large it is in bytes. This form does
--- not allow unused space in the vertex data. It assumes the vertex attribute
--- "arrays" are packed and in the same order as the provided attribute list.
--- Uniforms for the program are not modified by this or remembered by the VAO.
--- For that, there is the uniform buffer object mechanism. The semantics of
--- this operation are probably the most complex thing in the API.
-setVertexLayout :: Program -> [VertexLayout] -> IO ()
-setVertexLayout (Program p) layout = do
+
+-- | This configures the currently bound VAO. It calls glVertexAttribPointer
+-- and glEnableVertexAttribArray.
+setVertexAttributeLayout :: Program -> VertexAttributeLayout -> IO ()
+setVertexAttributeLayout (Program p) layout = do
   let layout' = elaborateLayout 0 layout
   let total = totalLayout layout
   forM_ layout' $ \(name, size, offset, fmt) -> do
@@ -468,8 +542,9 @@ setVertexLayout (Program p) layout = do
       (fromIntegral . fromEnum $ norm)
       (fromIntegral offset)
       (castPtr (nullPtr `plusPtr` offset))
+    glEnableVertexAttribArray (fromIntegral attrib)
 
-elaborateLayout :: Int -> [VertexLayout] -> [(String, Int, Int, ComponentFormat)]
+elaborateLayout :: Int -> VertexAttributeLayout -> [(String, Int, Int, ComponentFormat)]
 elaborateLayout here layout = case layout of
   [] -> []
   (Unused n):xs -> elaborateLayout (here+n) xs
@@ -477,7 +552,7 @@ elaborateLayout here layout = case layout of
     let size = n * sizeOfVertexComponent fmt in
     (name, n, here, fmt) : elaborateLayout (here+size) xs
 
-totalLayout :: [VertexLayout] -> Int
+totalLayout :: VertexAttributeLayout -> Int
 totalLayout layout = sum (map arraySize layout) where
   arraySize (Unused n) = n
   arraySize (Attrib _ n fmt) = n * sizeOfVertexComponent fmt
@@ -617,7 +692,8 @@ drawIndexedTriangleFan = drawIndexed GL_TRIANGLE_FAN
 drawIndexed :: GLenum -> Int -> IndexFormat -> IO ()
 drawIndexed mode n fmt = glDrawElements mode (fromIntegral n) (toGL fmt) nullPtr
 
--- | Create a new 2D texture from a blob.
+-- | Create a new 2D texture from a blob, given its dimensions and pixel format.
+-- Dimensions should be powers of two.
 newTexture2D :: Vector Word8 -> ImageFormat -> IO Tex2D
 newTexture2D bytes (ImageFormat w h pixfmt)  = do
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
@@ -634,7 +710,8 @@ newTexture2D bytes (ImageFormat w h pixfmt)  = do
     (castPtr ptr)
   return (Tex2D n)
 
--- | Create a new cube map texture from six blobs.
+-- | Create a new cube map texture from six blobs and their respective formats.
+-- Dimensions should be powers of two.
 newCubeMap :: Cube (Vector Word8, ImageFormat) -> IO CubeMap
 newCubeMap (Cube s1 s2 s3 s4 s5 s6) = do
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
@@ -660,39 +737,43 @@ loadCubeMapSide (bytes, ImageFormat w h pixfmt) side = do
     GL_UNSIGNED_BYTE
     (castPtr ptr)
 
--- | Create an empty texture with the specified dimensions.
-newEmptyTexture2D :: Int -> Int -> IO Tex2D
-newEmptyTexture2D w' h' = do
-  let w = fromIntegral w'
-  let h = fromIntegral h'
+-- | Create an empty texture with the specified dimensions and format.
+newEmptyTexture2D :: Int -> Int -> PixelFormat -> IO Tex2D
+newEmptyTexture2D w h fmt = do
+  let w' = fromIntegral w
+  let h' = fromIntegral h
+  let fmt' = toGL fmt
+  let fmt'' = toGL fmt
   tex <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_2D tex
-  glTexImage2D GL_TEXTURE_2D 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_2D 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
   return (Tex2D tex)
 
 -- | Create a cubemap texture where each of the six sides has the specified
--- dimensions.
-newEmptyCubeMap :: Int -> Int -> IO CubeMap
-newEmptyCubeMap w' h' = do
-  let w = fromIntegral w'
-  let h = fromIntegral h'
+-- dimensions and format.
+newEmptyCubeMap :: Int -> Int -> PixelFormat -> IO CubeMap
+newEmptyCubeMap w h fmt = do
+  let w' = fromIntegral w
+  let h' = fromIntegral h
+  let fmt' = toGL fmt
+  let fmt'' = toGL fmt
   tex <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_CUBE_MAP tex
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_X 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Y 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0 GL_RGB w h 0 GL_RGB GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_X 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Y 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
+  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0 fmt' w' h' 0 fmt'' GL_UNSIGNED_BYTE nullPtr
   return (CubeMap tex)
   
 
--- | Bind a 2D texture to GL_TEXTURE_2D texture binding target and the currently
+-- | Bind a 2D texture to the 2D texture binding target and the currently
 -- active texture unit.
 bindTexture2D :: Tex2D -> IO ()
 bindTexture2D (Tex2D n) = glBindTexture GL_TEXTURE_2D n
 
--- | Bind a cubemap texture to GL_TEXTURE_CUBE_MAP texture binding target and
+-- | Bind a cubemap texture to the cubemap texture binding target and
 -- the currently active texture unit.
 bindTextureCubeMap :: CubeMap -> IO ()
 bindTextureCubeMap (CubeMap n) = glBindTexture GL_TEXTURE_CUBE_MAP n
@@ -702,21 +783,30 @@ setActiveTextureUnit :: Enum a => a -> IO ()
 setActiveTextureUnit n =
   (glActiveTexture . fromIntegral) (GL_TEXTURE0 + fromEnum n)
 
+-- | Set the filtering for the 2D texture currently bound to the 2D texture
+-- binding target.
 setTex2DFiltering :: Filtering -> IO ()
 setTex2DFiltering filt = do
   glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER (toGL filt)
   glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER (toGL filt)
 
+-- | Set the filtering for the cubemap texture currently bound to the cubemap
+-- texture binding target.
 setCubeMapFiltering :: Filtering -> IO ()
 setCubeMapFiltering filt = do
   glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_MIN_FILTER (toGL filt)
   glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_MAG_FILTER (toGL filt)
 
+-- | Set the wrapping mode for the 2D texture currently bound to the 2D
+-- texture binding target.
 setTex2DWrapping :: Wrapping -> IO ()
 setTex2DWrapping wrap = do
   glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S (toGL wrap)
   glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T (toGL wrap)
 
+-- | Set the wrapping mode for the cubemap texture currently bound to the
+-- cubemap texture binding target. Because no blending occurs between cube
+-- faces you probably want ClampToEdge.
 setCubeMapWrapping :: Wrapping -> IO ()
 setCubeMapWrapping wrap = do
   glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_S (toGL wrap)
