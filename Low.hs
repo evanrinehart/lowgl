@@ -8,7 +8,9 @@
 {-# LANGUAGE PatternSynonyms #-}
 module Graphics.GL.Low (
 
-  -- * Overview
+  -- * In a Nutshell
+  --
+  -- ** Overview
   -- | OpenGL is a graphics rendering interface. This library exposes a vastly
   -- simplified subset of OpenGL that is hopefully still complete enough for
   -- many purposes, such as following tutorials, making simple games, and
@@ -27,7 +29,7 @@ module Graphics.GL.Low (
   --
   -- (include link to example programs)
 
-  -- * Objects
+  -- ** Objects
   -- | Objects may be created and destroyed by client code. They include:
   --
   -- - Vertex Array Object ('VAO')
@@ -37,11 +39,11 @@ module Graphics.GL.Low (
   -- - Framebuffer Objects ('FBO')
   -- - Renderbuffer Objects ('RBO')
 
-  -- * Binding Targets
-  -- | If objects are referenced with integers (called names in GL) then
-  -- binding targets can be thought of as global variables to put those
-  -- references. Many operations implicitly read from these globals to 
-  -- determine what the target object of the operation is. They include:
+  -- ** Binding Targets
+  -- | Objects are referenced with integers (called names in GL), so binding
+  -- targets can be thought of as global variables to put those references.
+  -- Many operations implicitly read from these globals to determine what the
+  -- target object of the operation is. They include:
   --
   -- - Vertex array binding target (for VAO)
   -- - Buffer binding targets (ARRAY_BUFFER and ELEMENT_ARRAY_BUFFER)
@@ -55,7 +57,7 @@ module Graphics.GL.Low (
   -- - Current active texture unit
   -- - Image attachment points of an FBO
 
-  -- * Shader Programs
+  -- ** Shader Programs
   -- | The role of the second half of a program, the fragment shader, is to
   -- compute the color and depth of pixels covered by rasterized primitives
   -- (points, lines, and triangles) in the process of rendering. The role of
@@ -67,7 +69,7 @@ module Graphics.GL.Low (
   -- rendering (but in a process separate from configuring the VAO). At most
   -- one Program can be "in use" at a time.
 
-  -- * VAO
+  -- ** VAO
   -- | The VAO is essential. At least one VAO must be created and bound to the
   -- vertex array binding target before rendering, before configuring a
   -- program's vertex attributes. Here is why: the VAO stores the association
@@ -87,7 +89,7 @@ module Graphics.GL.Low (
   -- target. For this reason you can think of that binding target as simply
   -- being a function of the VAO itself rather than a separate global state.
 
-  -- * Uniforms and Samplers (Textures)
+  -- ** Uniforms and Samplers (Textures)
   -- | Programs may have uniform variables and "sampler uniforms" as input.
   -- Uniforms are accessible from the vertex or fragment shader part of the
   -- program but their values are fixed during the course of a rendering command.
@@ -104,7 +106,7 @@ module Graphics.GL.Low (
   -- many kinds of multi-dimensional data that happen to be available through
   -- the samplers.
 
-  -- * Texture Objects and Texture Units
+  -- ** Texture Objects and Texture Units
   -- | Before a shader can use a texture it must be assigned to a texture unit.
   -- First set the active texture unit to the desired unit number
   -- ('setActiveTextureUnit') then bind the texture object to one of the
@@ -112,7 +114,7 @@ module Graphics.GL.Low (
   -- or cubemap). Binding a texture has the side effect of assigning it to the
   -- active texture unit.
 
-  -- * Custom Framebuffers
+  -- ** Custom Framebuffers
   -- | It is possible (and important to many techniques) to utilize an
   -- off-screen render target. To do this create an FBO ('newFBO'), bind it to
   -- the framebuffer binding target ('bindFramebuffer') and attach a color
@@ -129,7 +131,7 @@ module Graphics.GL.Low (
   -- example you may need a depth buffer to do depth testing, or you may want
   -- to ignore the (required for rendering to work at all) color buffer.
 
-  -- * Images and Image Formats
+  -- ** Images and Image Formats
   -- | FBOs have attachment points for /images/. A texture serves as an image
   -- and a renderbuffer object serves as an image. Images have an "internal
   -- format" which describes the size and interpretation of pixel components.
@@ -143,7 +145,7 @@ module Graphics.GL.Low (
   -- probably revise, because it may greatly improve performance to use some
   -- of the 16-bit color formats rather than 32.)
 
-  -- * Depth Testing, Stencil Testing, Scissor Testing, Facet Culling
+  -- ** Depth Testing, Stencil Testing, Scissor Testing, Facet Culling
   -- | The depth buffer and stencil buffers, if present in the current
   -- framebuffer, can be used to avoid rendering to points of the screen by
   -- testing against the value stored at those points. For example if commanded
@@ -158,7 +160,7 @@ module Graphics.GL.Low (
   -- Polygons facing toward or away from the viewer can be dropped (or culled)
   -- from rendering with 'enableCulling'.
 
-  -- * Coordinate Systems
+  -- ** Coordinate Systems
   -- | - Screen space is simply the 2D coordinate system of your window.
   -- The viewport transformation (see 'setViewport') determines where in the
   -- window the mapping of the NDS cube (see below) will appear.
@@ -176,7 +178,7 @@ module Graphics.GL.Low (
   -- into clip space, representing generally the position and direction the
   -- user is viewing the scene from.
 
-  -- * Rendering Points, Lines, and Triangles
+  -- ** Rendering Points, Lines, and Triangles
   -- | The draw family (ex. 'drawTriangles') of commands commissions the
   -- rendering of a certain number of vertices worth of primitives. The
   -- current program will get input from the current VAO, the current texture
@@ -192,6 +194,9 @@ module Graphics.GL.Low (
   -- ElementArray currently bound to the element array binding target. This
   -- mainly allows a huge reuse of vertex data in the case that the object
   -- being rendered forms a closed mesh.
+
+
+
 
   -- * VAO
   VAO,
@@ -305,7 +310,6 @@ module Graphics.GL.Low (
   -- ** Color Buffer
   enableColorWriting,
   disableColorWriting,
-  Color(..),
   clearColorBuffer,
 
   -- ** Depth Test
@@ -333,6 +337,30 @@ module Graphics.GL.Low (
   disableCulling,
 
   -- ** Blending
+  -- | When blending is enabled, colors written to the color buffer will be
+  -- blended with the color already there using a formula. The three options
+  -- for the formula are ('setBlendEquation'):
+  --
+  -- - Xs + Yd (FuncAdd, the default)
+  -- - Xs - Yd (FuncSub)
+  -- - Yd - Xs (FuncReverseSubtract)
+  --
+  -- where X and Y are source and destination color components respetively.
+  -- The factors s and d are blending factors which can be configured
+  -- ('setBlendFactors') and should depend on the alpha channel to get a correct
+  -- transparency effect. The typical choice is
+  --
+  -- @
+  -- setBlendFactors BlendSourceAlpha BlendOneMinusSourceAlpha
+  -- @
+  --
+  -- When using blending the order of rendering matters. The farther away
+  -- primitives should be rendered first to get transparent materials to look
+  -- right. This means a depth test is unhelpful when using this technique.
+  -- Also blending many layers of transparent primitives can significantly
+  -- degrade performance. For these reasons transparency effects may be better
+  -- accomplished with an off-screen rendering pass followed by a suitable shader.
+
   BlendFactor(..),
   BlendEquation(..),
   enableBlending,
@@ -430,8 +458,8 @@ newtype Tex2D a = Tex2D GLuint deriving Show
 -- texture if it has been bound to the appropriate texture unit.
 newtype CubeMap a = CubeMap GLuint deriving Show
 
--- | A framebuffer object is an alternative rendering target. Once an FBO is
--- bound to framebuffer binding target, it is possible to attach images
+-- | A framebuffer object is an alternative rendering destination. Once an FBO
+-- is bound to framebuffer binding target, it is possible to attach images
 -- (textures or RBOs) for color, depth, or stencil rendering.
 newtype FBO = FBO GLuint deriving Show
 
@@ -483,8 +511,7 @@ data LayoutElement =
 type VertexAttributeLayout = [LayoutElement]
 
 -- | The size and interpretation of a vertex attribute component. Normalized
--- components will be mapped to floats in the range [0, 1]. Unnormalized
--- integral components will be mapped to ints in the shader program.
+-- components will be mapped to floats in the range [0, 1].
 data ComponentFormat =
   VFloat | -- ^ 4-byte float
   VByte | 
@@ -524,12 +551,9 @@ data UsageHint = StaticDraw  -- ^ Data will seldomly change.
                  deriving Show
 
 instance ToGL UsageHint where
-  toGL StreamDraw  = GL_STREAM_DRAW
   toGL StaticDraw  = GL_STATIC_DRAW
   toGL DynamicDraw = GL_DYNAMIC_DRAW
-
--- | RGBA color quad.
-data Color = Color !Float !Float !Float !Float deriving Show
+  toGL StreamDraw  = GL_STREAM_DRAW
 
 
 -- | 1-byte alpha channel only.
@@ -698,6 +722,12 @@ data BlendEquation =
 instance Default BlendEquation where
   def = FuncAdd
 
+instance ToGL BlendEquation where
+  toGL FuncAdd = GL_FUNC_ADD
+  toGL FuncSubtract = GL_FUNC_SUBTRACT
+  toGL FuncReverseSubtract = GL_FUNC_REVERSE_SUBTRACT
+
+
 -- | Blending factors.
 data BlendFactor =
   BlendOne |
@@ -706,6 +736,11 @@ data BlendFactor =
   BlendOneMinusSourceAlpha
     deriving Show
 
+instance ToGL BlendFactor where
+  toGL BlendOne = GL_ONE
+  toGL BlendZero = GL_ZERO
+  toGL BlendSourceAlpha = GL_SRC_ALPHA
+  toGL BlendOneMinusSourceAlpha = GL_ONE_MINUS_SRC_ALPHA
 
 -- | The default framebuffer. Bind this to render to the screen as usual.
 -- Use the Default instance method 'def' to construct it.
@@ -1181,9 +1216,9 @@ disableColorWriting = glColorMask GL_FALSE GL_FALSE GL_FALSE GL_FALSE
 
 -- | Clear the color buffer of the current framebuffer with the specified
 -- color. Has no effect if writing to the color buffer is disabled.
-clearColorBuffer :: Color -> IO ()
-clearColorBuffer (Color r g b a) = do
-  glClearColor (realToFrac r) (realToFrac g) (realToFrac b) (realToFrac a)
+clearColorBuffer :: (Float, Float, Float) -> IO ()
+clearColorBuffer (r, g, b) = do
+  glClearColor (realToFrac r) (realToFrac g) (realToFrac b) 1.0
   glClear GL_COLOR_BUFFER_BIT
 
 -- | Enable the depth test. Attempting to render pixels with a depth value
@@ -1344,19 +1379,19 @@ deleteRBO (RBO n) = withArray [n] (\ptr -> glDeleteRenderbuffers 1 ptr)
 
 -- | Enable alpha blending.
 enableBlending :: IO ()
-enableBlending = return ()
+enableBlending = glEnable GL_BLEND
 
 -- | Disable alpha blending.
 disableBlending :: IO ()
-disableBlending = return ()
+disableBlending = glDisable GL_BLEND
 
 -- | Set the computation for source and destination blending factors.
 setBlendFactors :: BlendFactor -> BlendFactor -> IO ()
-setBlendFactors s d = return ()
+setBlendFactors s d = glBlendFunc (toGL s) (toGL d)
 
 -- | Set the overall blending function.
 setBlendEquation :: BlendEquation -> IO ()
-setBlendEquation e = return ()
+setBlendEquation e = glBlendEquation (toGL e)
 
 
 
