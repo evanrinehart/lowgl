@@ -16,7 +16,7 @@ version:             0.1.0.0
 synopsis:            Basic gl wrapper and reference
 
 -- A longer description of the package.
--- description:         
+description:         This library exposes a vastly simplified subset of OpenGL that is hopefully still complete enough for many purposes, such as following tutorials, making simple games, and demos.
 
 -- The license under which the package is released.
 license:             BSD2
@@ -65,3 +65,12 @@ library
   -- Base language which the package is written in.
   default-language:    Haskell2010
   
+  
+source-repository head
+  type: git
+  location: https://github.com/evanrinehart/lowgl
+
+source-repository this
+  type: git
+  location: https://github.com/evanrinehart/lowgl
+  tag: 0.1.0.0
