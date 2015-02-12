@@ -13,19 +13,19 @@ name:                lowgl
 version:             0.1.0.0
 
 -- A short (one-line) description of the package.
--- synopsis:            
+synopsis:            Basic gl wrapper and reference
 
 -- A longer description of the package.
 -- description:         
 
 -- The license under which the package is released.
--- license:             
+license:             BSD
 
 -- The file containing the license text.
 license-file:        LICENSE
 
 -- The package author(s).
-author:              EvanR
+author:              Evan Rinehart
 
 -- An email address to which users can send suggestions, bug reports, and 
 -- patches.
