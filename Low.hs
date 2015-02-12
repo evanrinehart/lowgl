@@ -5,11 +5,199 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE EmptyDataDecls #-}
+{-# LANGUAGE PatternSynonyms #-}
 module Graphics.GL.Low (
+
+  -- * Overview
+  -- | OpenGL is a graphics rendering interface. This library exposes a vastly
+  -- simplified subset of OpenGL that is hopefully still complete enough for
+  -- many purposes, such as following tutorials, making simple games, and
+  -- demos. In particular the intention is to concentrate on a subset of
+  -- OpenGL 3.2 (Core Profile) roughly corresponding to ES 2.0.
+  --
+  -- A second primary purpose is to document the complex model behind the
+  -- interface in a way that is more elaborate than tutorials and more concise
+  -- than the spec. As such, this is an experimental project to aid my own
+  -- process of understanding OpenGL. It seems that understanding the entire
+  -- picture up-front is the only way to get started, so this should also serve
+  -- as a quick reference guide to the core commands and concepts.
+  --
+  -- This library uses the `gl' package for raw bindings to OpenGL and the
+  -- `linear' package for matrices.
+  --
+  -- (include link to example programs)
+
+  -- * Objects
+  -- | Objects may be created and destroyed by client code. They include:
+  --
+  -- - Vertex Array Object ('VAO')
+  -- - Buffer Objects ('VBO', 'ElementArray')
+  -- - Textures ('Tex2D', 'CubeMap')
+  -- - Shader 'Program's
+  -- - Framebuffer Objects ('FBO')
+  -- - Renderbuffer Objects ('RBO')
+
+  -- * Binding Targets
+  -- | If objects are referenced with integers (called names in GL) then
+  -- binding targets can be thought of as global variables to put those
+  -- references. Many operations implicitly read from these globals to 
+  -- determine what the target object of the operation is. They include:
+  --
+  -- - Vertex array binding target (for VAO)
+  -- - Buffer binding targets (ARRAY_BUFFER and ELEMENT_ARRAY_BUFFER)
+  -- - Texture binding targets (TEXTURE_2D and TEXTURE_CUBE_MAP)
+  -- - Framebuffer binding target (for FBO)
+  --
+  -- (not binding targets but similar)
+  --
+  -- - Shader program "in use"
+  -- - Texture units
+  -- - Current active texture unit
+  -- - Image attachment points of an FBO
+
+  -- * Shader Programs
+  -- | The role of the second half of a program, the fragment shader, is to
+  -- compute the color and depth of pixels covered by rasterized primitives
+  -- (points, lines, and triangles) in the process of rendering. The role of
+  -- the /first/ half of the program (vertex program) is to arrange the vertices
+  -- of those primitives somewhere in clip space. Where these vertices and
+  -- their attributes come from in the first place is determined by the VAO
+  -- bound to the vertex array binding target. The program may also make use
+  -- of uniform variables and texture units assigned by client code before
+  -- rendering (but in a process separate from configuring the VAO). At most
+  -- one Program can be "in use" at a time.
+
+  -- * VAO
+  -- | The VAO is essential. At least one VAO must be created and bound to the
+  -- vertex array binding target before rendering, before configuring a
+  -- program's vertex attributes. Here is why: the VAO stores the association
+  -- between input variables in the program and a VBO from which to pipe input
+  -- from. It also stores the format of the VBO data, which is otherwise just
+  -- a big blob. Finally, the VAO stores the state of the element array binding
+  -- target used for indexed rendering.
+  --
+  -- After installing a program with 'useProgram' and binding a source VBO
+  -- to the array buffer binding target ('bindVBO') then the bound VAO can be
+  -- updated ('setVertexAttributeLayout') with new vertex attribute information.
+  -- After this, the VBO can be rebound to configure a different set of inputs
+  -- with a different source. Many VAOs can be created and swapped out to pipe
+  -- vertex data in different ways to different programs (or the same program).
+  --
+  -- When a VAO is bound it restores the state of the element array binding
+  -- target. For this reason you can think of that binding target as simply
+  -- being a function of the VAO itself rather than a separate global state.
+
+  -- * Uniforms and Samplers (Textures)
+  -- | Programs may have uniform variables and "sampler uniforms" as input.
+  -- Uniforms are accessible from the vertex or fragment shader part of the
+  -- program but their values are fixed during the course of a rendering command.
+  -- They can be set and reset with the setUniform family (ex. 'setUniform1f'),
+  -- which updates a program object with new uniform values. Among other
+  -- things, updating the uniforms each frame is the main way to animate a
+  -- scene.
+  --
+  -- Samplers are textures that the shader can interpolate to get "in between"
+  -- values. The texture a sampler uses is determined by the contents of the
+  -- texture unit that that sampler points to. The sampler is a uniform with
+  -- an integer type. This integer is the texture unit to use. The word texture
+  -- should not be construed to mean a color image. Shaders can make use of
+  -- many kinds of multi-dimensional data that happen to be available through
+  -- the samplers.
+
+  -- * Texture Objects and Texture Units
+  -- | Before a shader can use a texture it must be assigned to a texture unit.
+  -- First set the active texture unit to the desired unit number
+  -- ('setActiveTextureUnit') then bind the texture object to one of the
+  -- two texture binding targets, depending on what kind of texture it is (2D
+  -- or cubemap). Binding a texture has the side effect of assigning it to the
+  -- active texture unit.
+
+  -- * Custom Framebuffers
+  -- | It is possible (and important to many techniques) to utilize an
+  -- off-screen render target. To do this create an FBO ('newFBO'), bind it to
+  -- the framebuffer binding target ('bindFramebuffer') and attach a color
+  -- /image/ object (texture or renderbuffer object). If necessary a depth
+  -- image or combination depth-stencil image can be attached as well. If no
+  -- color image is attached then the FBO is incomplete and rendering will be
+  -- an error.  After rendering to an FBO any textures that were attached can
+  -- be used for a second pass by assigning them to a texture unit. Watch out
+  -- for feedback loops accidentally sampling a texture that is also being
+  -- rendered to at the same time!
+  --
+  -- A renderbuffer object is a minor character to be used when you do not
+  -- expect to use the results of rendering but need an image anyway. For
+  -- example you may need a depth buffer to do depth testing, or you may want
+  -- to ignore the (required for rendering to work at all) color buffer.
+
+  -- * Images and Image Formats
+  -- | FBOs have attachment points for /images/. A texture serves as an image
+  -- and a renderbuffer object serves as an image. Images have an "internal
+  -- format" which describes the size and interpretation of pixel components.
+  -- There are seven internal formats, five of which are color image formats
+  -- such as grayscale and RGB. The other two are the depth buffer format and
+  -- the combination depth-stencil format. RBOs ('newRBO') and empty textures
+  -- ('newEmptyTexture2D', 'newEmptyCubeMap') can be created with any of these
+  -- formats.
+  --
+  -- (The above is a gross simplification of OpenGL's image formats. I should
+  -- probably revise, because it may greatly improve performance to use some
+  -- of the 16-bit color formats rather than 32.)
+
+  -- * Depth Testing, Stencil Testing, Scissor Testing, Facet Culling
+  -- | The depth buffer and stencil buffers, if present in the current
+  -- framebuffer, can be used to avoid rendering to points of the screen by
+  -- testing against the value stored at those points. For example if commanded
+  -- to show a triangle in a region of the framebuffer with a depth greater
+  -- than current depth buffer values, then the triangle may not be rendered to
+  -- the color buffer or anywhere else (depending on settings). There are many
+  -- global settings to switch on and off these tests and the ability to
+  -- modify the buffers involved. The stencil test in particular is highly
+  -- configurable. The scissor test is the simplest: when activated nothing
+  -- outside the scissor box (in screen space) will be rendered. The only
+  -- other configuration is to set that scissor box ('setScissorBox').
+  -- Polygons facing toward or away from the viewer can be dropped (or culled)
+  -- from rendering with 'enableCulling'.
+
+  -- * Coordinate Systems
+  -- | - Screen space is simply the 2D coordinate system of your window.
+  -- The viewport transformation (see 'setViewport') determines where in the
+  -- window the mapping of the NDS cube (see below) will appear.
+  -- - NDS, normalized device coordinates, or sometimes viewport space is a
+  -- cube 2x2x2 centered at the origin the inside of which is your final scene,
+  -- before it is mapped to the screen via the viewport setting (see
+  -- 'setViewport'). If an orthographic projection was used to put the scene in
+  -- clip space then clip space and NDS are the same.
+  -- - Clip space is the destination of vertices transformed by the
+  -- vertex program. Objects here are mapped to NDS using the perspective
+  -- division technique to account for the case that the vertex shader used
+  -- a perspective matrix.
+  -- - Model space is the name for positions of raw vertices as present in
+  -- the VBOs. The vertex program will want to somehow move these vertexes
+  -- into clip space, representing generally the position and direction the
+  -- user is viewing the scene from.
+
+  -- * Rendering Points, Lines, and Triangles
+  -- | The draw family (ex. 'drawTriangles') of commands commissions the
+  -- rendering of a certain number of vertices worth of primitives. The
+  -- current program will get input from the current VAO, the current texture
+  -- units, and execute on all the potentially affected pixels in the current
+  -- framebuffer. Vertexes are consumed in the order they appear in their
+  -- respective source VBOs. If the VAO is missing, the program is missing, or
+  -- the current framebuffer has no color attachment, then rendering will not
+  -- work.
+  --
+  -- The drawIndexed family (ex. 'drawIndexedTriangles') of commands carries
+  -- out the same effects as the non-indexed rendering commands but traverses
+  -- vertices in an order determined by the sequence of indexes packed in the
+  -- ElementArray currently bound to the element array binding target. This
+  -- mainly allows a huge reuse of vertex data in the case that the object
+  -- being rendered forms a closed mesh.
+
   -- * VAO
   VAO,
   newVAO,
   bindVAO,
+  deleteVAO,
 
   -- * Buffer Objects
   -- ** VBO
@@ -18,6 +206,7 @@ module Graphics.GL.Low (
   newVBO,
   bindVBO,
   updateVBO,
+  deleteVBO,
 
   -- ** Element Array
   ElementArray,
@@ -25,17 +214,15 @@ module Graphics.GL.Low (
   newElementArray,
   bindElementArray,
   updateElementArray,
+  deleteElementArray,
 
   -- * Shader Program
   Program,
   ProgramError(..),
-
-  -- ** Compile and Link
   newProgram,
   newProgramSafe,
-
-  -- ** Using
   useProgram,
+  deleteProgram,
 
   -- ** Vertex Attributes
   VertexAttributeLayout(..),
@@ -78,6 +265,7 @@ module Graphics.GL.Low (
   newCubeMap,
   newEmptyTexture2D,
   newEmptyCubeMap,
+  deleteTexture,
   setActiveTextureUnit,
   bindTexture2D,
   bindTextureCubeMap,
@@ -157,17 +345,23 @@ module Graphics.GL.Low (
   setViewport,
 
   -- * Framebuffers
+  DefaultFramebuffer,
   FBO,
-  defaultFBO,
   bindFramebuffer,
-  newFramebuffer,
+  newFBO,
   attachTex2D,
   attachCubeMap,
   attachRBO,
+  deleteFBO,
 
   -- * Renderbuffers
   RBO,
   newRBO,
+  deleteRBO,
+
+  -- * Errors
+  GLError(..),
+  getGLError,
 
   -- * Image Formats
   Alpha,
@@ -180,6 +374,8 @@ module Graphics.GL.Low (
 
   -- * Classes
   InternalFormat(..),
+  Framebuffer(..),
+  Texture(..),
   Attachable(..)
 
 ) where
@@ -220,7 +416,7 @@ newtype Program = Program GLuint deriving Show
 -- | A VBO is a buffer object which has vertex data. Shader programs use VBOs
 -- as input to their vertex attributes according to the configuration of the
 -- bound VAO.
-data VBO = VBO GLuint Int deriving Show
+data VBO = VBO GLuint deriving Show
 
 -- | A buffer object which has a packed sequence of vertex indices. Indexed
 -- rendering uses the ElementArray bound to the element array binding target.
@@ -234,14 +430,10 @@ newtype Tex2D a = Tex2D GLuint deriving Show
 -- texture if it has been bound to the appropriate texture unit.
 newtype CubeMap a = CubeMap GLuint deriving Show
 
--- | A framebuffer object contains up to three attachments: a color buffer,
--- a depth buffer, and a stencil buffer. Each attachment may be a texture
--- object or a renderbuffer object. Rendering commands output graphics to the
--- attachments of the FBO currently bound to the framebuffer binding target.
+-- | A framebuffer object is an alternative rendering target. Once an FBO is
+-- bound to framebuffer binding target, it is possible to attach images
+-- (textures or RBOs) for color, depth, or stencil rendering.
 newtype FBO = FBO GLuint deriving Show
-
-instance Default FBO where
-  def = FBO 0
 
 
 -- | Texture filtering modes.
@@ -464,8 +656,36 @@ data ProgramError =
   
 instance Exception ProgramError
 
+-- | Detectable errors.
+data GLError =
+  InvalidEnum | -- ^ Enum argument out of range.
+  InvalidValue | -- ^ Integer argument out of range.
+  InvalidOperation | -- ^ Operation illegal in current state.
+  InvalidFramebufferOperation | -- ^ Framebuffer is not complete.
+  OutOfMemory
+    deriving Typeable
+
+instance Exception GLError
+
+instance Show GLError where
+  show InvalidEnum = "INVALID_ENUM enum argument out of range"
+  show InvalidValue = "INVALID_VALUE Numeric argument out of range"
+  show InvalidOperation = "INVALID_OPERATION Illegal in current state"
+  show InvalidFramebufferOperation = "INVALID_FRAMEBUFFER_OPERATION Framebuffer object is not complete"
+  show OutOfMemory = "Not enough memory left to execute command"
+
 class ToGL a where
   toGL :: (Num b, Eq b) => a -> b
+
+-- | Textures have an internal numeric name.
+class Texture a where
+  textureName :: Num b => a -> b
+
+instance Texture (Tex2D a) where
+  textureName (Tex2D n) = fromIntegral n
+
+instance Texture (CubeMap a) where
+  textureName (CubeMap n) = fromIntegral n
 
 
 -- | Blending functions for alpha blending.
@@ -487,6 +707,25 @@ data BlendFactor =
     deriving Show
 
 
+-- | The default framebuffer. Bind this to render to the screen as usual.
+-- Use the Default instance method 'def' to construct it.
+data DefaultFramebuffer = DefaultFramebuffer deriving Show
+
+instance Default DefaultFramebuffer where
+  def = DefaultFramebuffer
+
+-- | Framebuffers can be bound to the framebuffer binding target. There is
+-- a default framebuffer and the client may create an arbitrary number of
+-- new framebuffer objects.
+class Framebuffer a where
+  framebufferName :: Num b => a -> b
+
+instance Framebuffer DefaultFramebuffer where
+  framebufferName _ = 0
+
+instance Framebuffer FBO where
+  framebufferName (FBO n) = fromIntegral n
+
 
 
 -- | Create a new VAO. The only thing you can do with a VAO is bind it to
@@ -495,6 +734,10 @@ newVAO :: IO VAO
 newVAO = do
   n <- alloca (\ptr -> glGenVertexArrays 1 ptr >> peek ptr)
   return (VAO n)
+
+-- | Delete a VAO.
+deleteVAO :: VAO -> IO ()
+deleteVAO (VAO n) = withArray [n] (\ptr -> glDeleteVertexArrays 1 ptr)
 
 -- | Assign the VAO to the vertex array binding target. The VAO already bound
 -- will be replaced, if any.
@@ -514,7 +757,11 @@ newVBO src usage = do
     (fromIntegral len)
     (castPtr ptr)
     (toGL usage)
-  return (VBO n len)
+  return (VBO n)
+
+-- | Delete a VBO.
+deleteVBO :: VBO -> IO ()
+deleteVBO (VBO n) = withArray [n] (\ptr -> glDeleteBuffers 1 ptr)
 
 -- | Modify the data in the currently bound VBO starting from the specified
 -- index in bytes.
@@ -530,7 +777,7 @@ updateVBO src offset = do
 -- | Bind a VBO to the array buffer binding target. The buffer object bound
 -- there will be replaced, if any.
 bindVBO :: VBO -> IO ()
-bindVBO (VBO n _) = glBindBuffer GL_ARRAY_BUFFER n
+bindVBO (VBO n) = glBindBuffer GL_ARRAY_BUFFER n
 
 
 -- | Create a new ElementArray buffer object from the blob of packed indices.
@@ -547,6 +794,10 @@ newElementArray bytes usage = do
       (castPtr ptr)
       (toGL usage)
   return (ElementArray n)
+
+-- | Delete an ElementArray
+deleteElementArray :: ElementArray -> IO ()
+deleteElementArray (ElementArray n) = withArray [n] (\ptr -> glDeleteBuffers 1 ptr)
   
 -- | Modify contents in the currently bound ElementArray starting at the
 -- specified index in bytes.
@@ -569,6 +820,10 @@ bindElementArray (ElementArray n) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
 -- | Same as 'newProgram' but does not throw exceptions.
 newProgramSafe :: String -> String -> IO (Either ProgramError Program)
 newProgramSafe vcode fcode = try $ newProgram vcode fcode
+
+-- | Delete a program.
+deleteProgram :: Program -> IO ()
+deleteProgram (Program n) = glDeleteProgram n
 
 -- | Compile the code for a vertex shader and a fragment shader, then link
 -- them into a new program. If the compiler or linker fails it will throw
@@ -805,6 +1060,10 @@ newTexture2D bytes (Dimensions w h)  = do
     (castPtr ptr)
   return tex
 
+-- | Delete a texture.
+deleteTexture :: Texture a => a -> IO ()
+deleteTexture x = withArray [textureName x] (\ptr -> glDeleteTextures 1 ptr)
+
 -- | Create a new cube map texture from six blobs and their respective formats.
 -- Dimensions should be powers of two.
 newCubeMap :: InternalFormat a
@@ -1012,26 +1271,26 @@ enableCulling c = do
 disableCulling :: IO ()
 disableCulling = glDisable GL_CULL_FACE
 
--- | Set the viewport.
+-- | Set the viewport. The default viewport simply covers the entire window.
 setViewport :: Viewport -> IO ()
 setViewport (Viewport x y w h) =
   glViewport (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
 
--- | The default framebuffer object. Bind this to render to the screen as usual.
-defaultFBO :: FBO
-defaultFBO = def
-
--- | Binds an FBO to the framebuffer binding target. Replaces the FBO
--- already bound there.
-bindFramebuffer :: FBO -> IO ()
-bindFramebuffer (FBO n) = glBindFramebuffer GL_FRAMEBUFFER n
+-- | Binds an FBO or the default framebuffer to the framebuffer binding target.
+-- Replaces the framebuffer already bound there.
+bindFramebuffer :: Framebuffer a => a -> IO ()
+bindFramebuffer x = glBindFramebuffer GL_FRAMEBUFFER (framebufferName x)
 
 -- | Create a new framebuffer object. Before the framebuffer can be used for
 -- rendering it must have a color image attachment.
-newFramebuffer :: IO FBO
-newFramebuffer = do
+newFBO :: IO FBO
+newFBO = do
   n <- alloca (\ptr -> glGenFramebuffers 1 ptr >> peek ptr)
   return (FBO n)
+
+-- | Delete an FBO.
+deleteFBO :: FBO -> IO ()
+deleteFBO (FBO n) = withArray [n] (\ptr -> glDeleteFramebuffers 1 ptr)
 
 -- | Attach a 2D texture to the FBO currently bound to the
 -- framebuffer binding target.
@@ -1078,6 +1337,9 @@ newRBO w h = do
     (fromIntegral h)
   return rbo
 
+-- | Delete an RBO.
+deleteRBO :: RBO a -> IO ()
+deleteRBO (RBO n) = withArray [n] (\ptr -> glDeleteRenderbuffers 1 ptr)
 
 
 -- | Enable alpha blending.
@@ -1095,3 +1357,18 @@ setBlendFactors s d = return ()
 -- | Set the overall blending function.
 setBlendEquation :: BlendEquation -> IO ()
 setBlendEquation e = return ()
+
+
+
+-- | Check for a GL Error.
+getGLError :: IO (Maybe GLError)
+getGLError = do
+  n <- glGetError
+  return $ case n of
+    GL_NO_ERROR -> Nothing
+    GL_INVALID_ENUM -> Just InvalidEnum
+    GL_INVALID_VALUE -> Just InvalidValue
+    GL_INVALID_OPERATION -> Just InvalidOperation
+    GL_INVALID_FRAMEBUFFER_OPERATION -> Just InvalidFramebufferOperation
+    GL_OUT_OF_MEMORY -> Just OutOfMemory
+    _ -> error ("unknown GL error " ++ show n)
