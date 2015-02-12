@@ -19,7 +19,7 @@ synopsis:            Basic gl wrapper and reference
 -- description:         
 
 -- The license under which the package is released.
-license:             BSD
+license:             BSD2
 
 -- The file containing the license text.
 license-file:        LICENSE
@@ -48,7 +48,7 @@ cabal-version:       >=1.10
 
 library
   -- Modules exported by the library.
-  exposed-modules:     Low
+  exposed-modules:     Graphics.GL.Low
   
   -- Modules included in this library but not exported.
   -- other-modules:       
