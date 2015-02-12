@@ -4,6 +4,7 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
+{-# LANGUAGE EmptyDataDecls #-}
 module Graphics.GL.Low (
   -- * VAO
   VAO,
@@ -179,7 +180,7 @@ module Graphics.GL.Low (
 
   -- * Classes
   InternalFormat(..),
-  Attachable(..),
+  Attachable(..)
 
 ) where
 
@@ -216,14 +217,14 @@ newtype VAO = VAO GLuint deriving Show
 -- it's just not called that.
 newtype Program = Program GLuint deriving Show
 
--- | A VBO is a buffer object which has vertex data. Programs use VBOs as
--- input to their vertex attributes according to the configuration of the
+-- | A VBO is a buffer object which has vertex data. Shader programs use VBOs
+-- as input to their vertex attributes according to the configuration of the
 -- bound VAO.
 data VBO = VBO GLuint Int deriving Show
 
--- | A buffer object which has a sequence of vertex indices. Indexed rendering
--- uses the ElementArray bound to the element array binding target.
-data ElementArray = ElementArray GLuint Int IndexFormat deriving Show
+-- | A buffer object which has a packed sequence of vertex indices. Indexed
+-- rendering uses the ElementArray bound to the element array binding target.
+data ElementArray = ElementArray GLuint deriving Show
 
 -- | A 2D texture. A program can sample a texture if it has been bound to
 -- the appropriate texture unit.
@@ -324,18 +325,6 @@ instance ToGL ComponentFormat where
   toGL VUIntNormalized = GL_UNSIGNED_INT
   
 
--- | How indices are packed in an ElementArray buffer object.
-data IndexFormat =
-  UByteIndices  |  -- ^ Each index is one unsigned byte.
-  UShortIndices |  -- ^ Each index is a two byte unsigned int.
-  UIntIndices      -- ^ Each index is a four byte unsigned int.
-    deriving Show
-
-instance ToGL IndexFormat where
-  toGL UByteIndices  = GL_UNSIGNED_BYTE
-  toGL UShortIndices = GL_UNSIGNED_SHORT
-  toGL UIntIndices   = GL_UNSIGNED_INT
-
 -- | Usage hint for allocation of buffer object storage.
 data UsageHint = StaticDraw  -- ^ Data will seldomly change.
                | DynamicDraw -- ^ Data will change.
@@ -407,6 +396,19 @@ instance Attachable Depth24 where
   attachPoint _ = GL_DEPTH_ATTACHMENT
 instance Attachable Depth24Stencil8 where
   attachPoint _ = GL_DEPTH_STENCIL_ATTACHMENT
+
+-- | How indices are packed in an ElementArray buffer object.
+data IndexFormat =
+  UByteIndices  | -- ^ Each index is one unsigned byte.
+  UShortIndices | -- ^ Each index is a two byte unsigned int.
+  UIntIndices     -- ^ Each index is a four byte unsigned int.
+    deriving Show
+
+instance ToGL IndexFormat where
+  toGL UByteIndices  = GL_UNSIGNED_BYTE
+  toGL UShortIndices = GL_UNSIGNED_SHORT
+  toGL UIntIndices   = GL_UNSIGNED_INT
+
 
 -- | An RBO is a kind of image object used for rendering. The only thing
 -- you can do with an RBO is attach it to an FBO.
@@ -531,45 +533,37 @@ bindVBO :: VBO -> IO ()
 bindVBO (VBO n _) = glBindBuffer GL_ARRAY_BUFFER n
 
 
--- | Pack a list of indices into a new buffer object. The usage argument
--- hints at how often you plan to modify the data.
-newElementArray :: [Int] -> IndexFormat -> UsageHint -> IO ElementArray
-newElementArray xs fmt usage = do
+-- | Create a new ElementArray buffer object from the blob of packed indices.
+-- The usage argument hints at how often you plan to modify the data.
+newElementArray :: Vector Word8 -> UsageHint -> IO ElementArray
+newElementArray bytes usage = do
   n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
   glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
-  len <- marshalIndexes xs fmt $ \len ptr -> do
+  let len = V.length bytes
+  unsafeWith bytes $ \ptr -> do
     glBufferData
       GL_ELEMENT_ARRAY_BUFFER
       (fromIntegral len)
       (castPtr ptr)
       (toGL usage)
-    return len
-  return (ElementArray n len fmt)
+  return (ElementArray n)
   
 -- | Modify contents in the currently bound ElementArray starting at the
 -- specified index in bytes.
-updateElementArray :: [Int] -> IndexFormat -> Int -> IO ()
-updateElementArray xs fmt offset = marshalIndexes xs fmt $ \len ptr -> do
+updateElementArray :: Vector Word8 -> Int -> IO ()
+updateElementArray bytes offset = unsafeWith bytes $ \ptr -> do
   glBufferSubData
     GL_ELEMENT_ARRAY_BUFFER
     (fromIntegral offset)
-    (fromIntegral len)
+    (fromIntegral (V.length bytes))
     (castPtr ptr)
-
-marshalIndexes :: [Int] -> IndexFormat -> (Int -> Ptr Word8 -> IO a) -> IO a
-marshalIndexes xs fmt act = case fmt of
-  UByteIndices  -> withArrayLen (map fromIntegral xs :: [Word8]) act
-  UShortIndices -> withArrayLen (map fromIntegral xs :: [Word16])
-                     (\n ptr -> act n (castPtr ptr))
-  UIntIndices   -> withArrayLen (map fromIntegral xs :: [Word32])
-                     (\n ptr -> act n (castPtr ptr))
 
 
 -- | Assign an ElementArray to the element array binding target. It will
 -- replace the ElementArray already bound there, if any. Note that the state
 -- of the element array binding target is a function of the current VAO.
 bindElementArray :: ElementArray -> IO ()
-bindElementArray (ElementArray n _ _) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
+bindElementArray (ElementArray n) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
 
 
 -- | Same as 'newProgram' but does not throw exceptions.
