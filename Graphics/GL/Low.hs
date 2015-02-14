@@ -18,8 +18,6 @@ module Graphics.GL.Low (
   --
   -- This library uses the `gl' package for raw bindings to OpenGL and the
   -- `linear' package for matrices.
-  --
-  -- (include link to example programs)
 
   -- ** Objects
   -- | Objects may be created and destroyed by client code. They include:
@@ -50,22 +48,22 @@ module Graphics.GL.Low (
   -- - Image attachment points of an FBO
 
   -- ** Shader Programs
-  -- | The role of the second half of a program, the fragment shader, is to
-  -- compute the color and depth of pixels covered by rasterized primitives
+  -- | The role of the second half of a shader program, the fragment shader, is
+  -- to compute the color and depth of pixels covered by rasterized primitives
   -- (points, lines, and triangles) in the process of rendering. The role of
-  -- the /first/ half of the program (vertex program) is to arrange the vertices
-  -- of those primitives somewhere in clip space. Where these vertices and
-  -- their attributes come from in the first place is determined by the VAO
-  -- bound to the vertex array binding target. The program may also make use
-  -- of uniform variables and texture units assigned by client code before
-  -- rendering (but in a process separate from configuring the VAO). At most
-  -- one Program can be "in use" at a time.
+  -- the /first/ half of the program (vertex program) is to arrange the
+  -- vertices of those primitives somewhere in clip space. Where these vertices
+  -- and their attributes come from in the first place is determined by the VAO
+  -- bound to the vertex array binding target. The program may also make use of
+  -- uniform variables and texture units assigned by client code before
+  -- rendering (but in a process completely separate from configuring the VAO).
+  -- At most one Program can be "in use" at a time.
 
   -- ** VAO
   -- | The VAO is essential. At least one VAO must be created and bound to the
   -- vertex array binding target before rendering, before configuring a
   -- program's vertex attributes. Here is why: the VAO stores the association
-  -- between input variables in the program and a VBO from which to pipe input
+  -- between vertex inputs in the program and a VBO from which to pipe input
   -- from. It also stores the format of the VBO data, which is otherwise just
   -- a big blob. Finally, the VAO stores the state of the element array binding
   -- target used for indexed rendering.
@@ -77,18 +75,19 @@ module Graphics.GL.Low (
   -- with a different source. Many VAOs can be created and swapped out to pipe
   -- vertex data in different ways to different programs (or the same program).
   --
-  -- When a VAO is bound it restores the state of the element array binding
-  -- target. For this reason you can think of that binding target as simply
-  -- being a function of the VAO itself rather than a separate global state.
+  -- When a VAO is bound ('bindVAO') it restores the state of the element array
+  -- binding target. For this reason you can think of that binding target as
+  -- simply being a function of the VAO itself rather than a separate global
+  -- state.
 
   -- ** Uniforms and Samplers (Textures)
-  -- | Programs may have uniform variables and "sampler uniforms" as input.
-  -- Uniforms are accessible from the vertex or fragment shader part of the
-  -- program but their values are fixed during the course of a rendering command.
-  -- They can be set and reset with the setUniform family (ex. 'setUniform1f'),
-  -- which updates a program object with new uniform values. Among other
-  -- things, updating the uniforms each frame is the main way to animate a
-  -- scene.
+  -- | Programs may also have uniform variables and "sampler uniforms" as
+  -- input. Uniforms are accessible from the vertex or fragment shader part of
+  -- the program but their values are fixed during the course of a rendering
+  -- command. They can be set and reset with the setUniform family (ex.
+  -- 'setUniform1f'), which updates the current program object with new uniform
+  -- values. Among other things, updating the uniforms each frame is the main
+  -- way to animate a scene.
   --
   -- Samplers are textures that the shader can interpolate to get "in between"
   -- values. The texture a sampler uses is determined by the contents of the
@@ -107,14 +106,14 @@ module Graphics.GL.Low (
   -- active texture unit.
 
   -- ** Custom Framebuffers
-  -- | It is possible (and important to many techniques) to utilize an
+  -- | It is possible (and important in many techniques) to utilize an
   -- off-screen render target. To do this create an FBO ('newFBO'), bind it to
   -- the framebuffer binding target ('bindFramebuffer') and attach a color
   -- /image/ object (texture or renderbuffer object). If necessary a depth
   -- image or combination depth-stencil image can be attached as well. If no
   -- color image is attached then the FBO is incomplete and rendering will be
   -- an error.  After rendering to an FBO any textures that were attached can
-  -- be used for a second pass by assigning them to a texture unit. Watch out
+  -- be used in a second pass by assigning them to a texture unit. Watch out
   -- for feedback loops accidentally sampling a texture that is also being
   -- rendered to at the same time!
   --
@@ -135,40 +134,48 @@ module Graphics.GL.Low (
   --
   -- (The above is a gross simplification of OpenGL's image formats. I should
   -- probably revise, because it may greatly improve performance to use some
-  -- of the 16-bit color formats rather than 32.)
+  -- of the 16-bit color formats rather than 32. Also HDR color format.)
 
-  -- ** Depth Testing, Stencil Testing, Scissor Testing, Facet Culling
-  -- | The depth buffer and stencil buffers, if present in the current
-  -- framebuffer, can be used to avoid rendering to points of the screen by
-  -- testing against the value stored at those points. For example if commanded
-  -- to show a triangle in a region of the framebuffer with a depth greater
-  -- than current depth buffer values, then the triangle may not be rendered to
-  -- the color buffer or anywhere else (depending on settings). There are many
-  -- global settings to switch on and off these tests and the ability to
-  -- modify the buffers involved. The stencil test in particular is highly
-  -- configurable. The scissor test is the simplest: when activated nothing
-  -- outside the scissor box (in screen space) will be rendered. The only
-  -- other configuration is to set that scissor box ('setScissorBox').
-  -- Polygons facing toward or away from the viewer can be dropped (or culled)
-  -- from rendering with 'enableCulling'.
+  -- ** Depth Testing and Stencil Testing
+  -- | The depth test and stencil test use extra buffers in parallel with the
+  -- color buffer to cause regions of pixels to not show. It does this by
+  -- making a comparison between the depth each pixel and the value present
+  -- in those buffers, then updating the buffers as necessary. The stencil
+  -- test in particular has many configurable options. See the respective
+  -- modules for the "Graphics.GL.Low.Depth" and "Graphics.GL.Low.Stencil"
+  -- tests. 
 
-  -- ** Coordinate Systems
-  -- | - Screen space is simply the 2D coordinate system of your window.
-  -- The viewport transformation (see 'setViewport') determines where in the
-  -- window the mapping of the NDS cube (see below) will appear.
-  -- - NDS, normalized device coordinates, or sometimes viewport space is a
-  -- cube 2x2x2 centered at the origin the inside of which is your final scene,
-  -- before it is mapped to the screen via the viewport setting (see
-  -- 'setViewport'). If an orthographic projection was used to put the scene in
-  -- clip space then clip space and NDS are the same.
-  -- - Clip space is the destination of vertices transformed by the
-  -- vertex program. Objects here are mapped to NDS using the perspective
-  -- division technique to account for the case that the vertex shader used
-  -- a perspective matrix.
-  -- - Model space is the name for positions of raw vertices as present in
-  -- the VBOs. The vertex program will want to somehow move these vertexes
-  -- into clip space, representing generally the position and direction the
-  -- user is viewing the scene from.
+  -- ** Scissor Test
+  -- | The scissor test, if enabled ('enableScissorTest'), disallows all
+  -- rendering outside of a rectangle region of the window called the scissor
+  -- box.
+
+  -- ** Coordinate Systems (Mappings)
+  -- | There are three transformation mechanisms which work together to get raw
+  -- vertex data from VBOs to rasterized primitives somewhere on the window.
+  -- You can imagine four coordinate systems between these three transformations
+  -- if you want to.
+  --
+  -- - The __vertex shader__ takes vertex positions as specified in vertex
+  -- attributes to clip space. This is how the client code specifies a camera,
+  -- movement of objects, and perspective.
+  -- - The __perspective division__ or ""W-divide"" takes vertices from clip space
+  -- and maps them to normalized device coordinates (NDC) by dividing all the
+  -- components of the vertex by that vertex's W component. This allows a
+  -- perspective effect to be accomplished in the shader by modifying the W
+  -- components. You can't configure this W-division; it just happens.  Note
+  -- that if W = 1 for all vertices this step has no effect. This is useful for
+  -- orthographic projections. The resulting geometry will be clipped to a
+  -- 2x2x2 cube centered around the origin. You can think of an XY plane of
+  -- this cube as the viewport of the final 2D image.
+  -- - The configurable __viewport transformation__ ('setViewport') will then
+  -- position the viewport somewhere in the window.  This step is necessary
+  -- because your window is probably not a 2x2 square.  The viewport
+  -- transformation is configured by specifying a rectangular region of your
+  -- window where you want the image to map to. The default setting for this is
+  -- to fill the entire window with the viewport.  If you didn't previously
+  -- account for your aspect ratio then this will have the effect of squishing
+  -- the scene, so you need to compensate in the vertex shader.
 
   -- ** Rendering Points, Lines, and Triangles
   -- | The draw family (ex. 'drawTriangles') of commands commissions the
@@ -186,8 +193,6 @@ module Graphics.GL.Low (
   -- ElementArray currently bound to the element array binding target. This
   -- mainly allows a huge reuse of vertex data in the case that the object
   -- being rendered forms a closed mesh.
-
-
 
 
   -- * VAO
