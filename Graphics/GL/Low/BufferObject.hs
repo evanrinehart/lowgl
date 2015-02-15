@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 -- | VBO and ElementArrays. Both are buffer objects but are used for two
 -- different things.
 module Graphics.GL.Low.BufferObject (
@@ -14,6 +15,7 @@ module Graphics.GL.Low.BufferObject (
 ) where
 
 import Foreign.Ptr
+import Foreign.ForeignPtr
 import Foreign.Marshal
 import Foreign.Storable
 import qualified Data.Vector.Storable as V
@@ -57,17 +59,8 @@ instance BufferObject ElementArray
 
 -- | Create a buffer object from a blob of bytes. The usage argument hints
 -- at how often you will modify the data.
-newVBO :: Vector Word8 -> UsageHint -> IO VBO
-newVBO src usage = do
-  n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
-  let len = V.length src
-  glBindBuffer GL_ARRAY_BUFFER n
-  V.unsafeWith src $ \ptr -> glBufferData
-    GL_ARRAY_BUFFER
-    (fromIntegral len)
-    (castPtr ptr)
-    (toGL usage)
-  return (VBO n)
+newVBO :: Storable a => Vector a -> UsageHint -> IO VBO
+newVBO = newBufferObject VBO GL_ARRAY_BUFFER
 
 -- | Delete a VBO or ElementArray.
 deleteBufferObject :: BufferObject a => a -> IO ()
@@ -75,14 +68,8 @@ deleteBufferObject bo = withArray [glObjectName bo] (\ptr -> glDeleteBuffers 1 p
 
 -- | Modify the data in the currently bound VBO starting from the specified
 -- index in bytes.
-updateVBO :: Vector Word8 -> Int -> IO ()
-updateVBO src offset = do
-  let len = V.length src
-  V.unsafeWith src $ \ptr -> glBufferSubData
-    GL_ARRAY_BUFFER 
-    (fromIntegral offset)
-    (fromIntegral len)
-    (castPtr ptr)
+updateVBO :: Storable a => Vector a -> Int -> IO ()
+updateVBO = updateBufferObject GL_ARRAY_BUFFER
 
 -- | Bind a VBO to the array buffer binding target. The buffer object bound
 -- there will be replaced, if any.
@@ -92,32 +79,42 @@ bindVBO (VBO n) = glBindBuffer GL_ARRAY_BUFFER n
 
 -- | Create a new ElementArray buffer object from the blob of packed indices.
 -- The usage argument hints at how often you plan to modify the data.
-newElementArray :: Vector Word8 -> UsageHint -> IO ElementArray
-newElementArray bytes usage = do
-  n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
-  glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
-  let len = V.length bytes
-  V.unsafeWith bytes $ \ptr -> do
-    glBufferData
-      GL_ELEMENT_ARRAY_BUFFER
-      (fromIntegral len)
-      (castPtr ptr)
-      (toGL usage)
-  return (ElementArray n)
+newElementArray :: Storable a => Vector a -> UsageHint -> IO ElementArray
+newElementArray = newBufferObject ElementArray GL_ELEMENT_ARRAY_BUFFER
 
 -- | Modify contents in the currently bound ElementArray starting at the
 -- specified index in bytes.
-updateElementArray :: Vector Word8 -> Int -> IO ()
-updateElementArray bytes offset = V.unsafeWith bytes $ \ptr -> do
-  glBufferSubData
-    GL_ELEMENT_ARRAY_BUFFER
-    (fromIntegral offset)
-    (fromIntegral (V.length bytes))
-    (castPtr ptr)
-
+updateElementArray :: Storable a => Vector a -> Int -> IO ()
+updateElementArray = updateBufferObject GL_ELEMENT_ARRAY_BUFFER
 
 -- | Assign an ElementArray to the element array binding target. It will
 -- replace the ElementArray already bound there, if any. Note that the state
 -- of the element array binding target is a function of the current VAO.
 bindElementArray :: ElementArray -> IO ()
 bindElementArray (ElementArray n) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
+
+
+newBufferObject :: forall a b . Storable a => (GLuint -> b) -> GLenum -> Vector a -> UsageHint -> IO b
+newBufferObject ctor target src usage = do
+  n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
+  glBindBuffer target n
+  let (fptr, off, len) = V.unsafeToForeignPtr src
+  let size = sizeOf (undefined :: a)
+  withForeignPtr fptr $ \ptr -> glBufferData
+    target
+    (fromIntegral (len * size))
+    (castPtr (ptr `plusPtr` off))
+    (toGL usage)
+  return (ctor n)
+
+updateBufferObject :: forall a . Storable a => GLenum -> Vector a -> Int -> IO ()
+updateBufferObject target bytes offset = do
+  let (fptr, off, len) = V.unsafeToForeignPtr bytes
+  let size = sizeOf (undefined :: a)
+  withForeignPtr fptr $ \ptr -> glBufferSubData
+    target
+    (fromIntegral offset)
+    (fromIntegral (len * size))
+    (castPtr (ptr `plusPtr` off))
+
+

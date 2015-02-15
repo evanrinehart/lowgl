@@ -1,8 +1,6 @@
 module Graphics.GL.Low (
 
-  -- * In a Nutshell
-  --
-  -- ** Overview
+  -- * Overview
   -- | OpenGL is a graphics rendering interface. This library exposes a vastly
   -- simplified subset of OpenGL that is hopefully still complete enough for
   -- many purposes, such as following tutorials, making simple games, and
@@ -18,6 +16,105 @@ module Graphics.GL.Low (
   --
   -- This library uses the `gl' package for raw bindings to OpenGL and the
   -- `linear' package for matrices.
+
+  -- * Example
+  --
+  -- | The hello world program shows a white triangle on a black background.
+  -- It uses the packages `GLFW-b' and `monad-loops'. Note that it forces a
+  -- 3.2 core profile when setting up the context through GLFW.
+  --
+  -- @
+  -- module Main where
+  --
+  -- import Control.Monad.Loops (whileM_)
+  -- import Data.Functor ((\<$\>))
+  -- import qualified Data.Vector.Storable as V
+  -- 
+  -- import qualified Graphics.UI.GLFW as GLFW
+  -- import Graphics.GL.Low
+  -- 
+  -- -- GLFW will be the shell of the demo
+  -- main = do
+  --   GLFW.init
+  --   GLFW.windowHint (GLFW.WindowHint'ContextVersionMajor 3)
+  --   GLFW.windowHint (GLFW.WindowHint'ContextVersionMinor 2)
+  --   GLFW.windowHint (GLFW.WindowHint'OpenGLForwardCompat True)
+  --   GLFW.windowHint (GLFW.WindowHint'OpenGLProfile GLFW.OpenGLProfile'Core)
+  --   mwin <- GLFW.createWindow 640 480 \"Demo\" Nothing Nothing
+  --   case mwin of
+  --     Nothing  -> putStrLn "createWindow failed"
+  --     Just win -> do
+  --       GLFW.makeContextCurrent (Just win)
+  --       GLFW.swapInterval 1
+  --       (vao, prog) <- setup -- load and configure objects
+  --       whileM_ (not \<$\> GLFW.windowShouldClose win) $ do
+  --         GLFW.pollEvents
+  --         draw vao prog -- render
+  --         GLFW.swapBuffers win
+  -- 
+  -- setup = do
+  --   -- establish a VAO
+  --   vao <- newVAO
+  --   bindVAO vao
+  --   -- load shader program
+  --   vsource <- readFile "hello.vert"
+  --   fsource <- readFile "hello.frag"
+  --   prog <- newProgram vsource fsource
+  --   useProgram prog
+  --   -- load vertex data: three 2D vertex positions
+  --   let blob = V.fromList
+  --         [ -0.5, -0.5
+  --         ,    0,  0.5
+  --         ,  0.5, -0.5 ] :: V.Vector Float
+  --   vbo <- newVBO blob StaticDraw
+  --   bindVBO vbo
+  --   -- connect program to vertex data via the VAO
+  --   setVertexAttributeLayout [Attrib "position" 2 VFloat]
+  --   return (vao, prog)
+  -- 
+  -- draw vao prog = do
+  --   clearColorBuffer (0,0,0)
+  --   bindVAO vao
+  --   useProgram prog
+  --   drawTriangles 3
+  -- @
+  --
+  -- The vertex shader file looks like
+  --
+  -- @
+  -- #version 150
+  --
+  -- in vec2 position;
+  --
+  -- void main()
+  -- {
+  --    gl_Position = vec4(position, 0.0, 1.0);
+  -- }
+  -- @
+  --
+  -- And the corresponding fragment shader file
+  --
+  -- @
+  -- #version 150
+  --
+  -- out vec4 outColor;
+  --
+  -- void main()
+  -- {
+  --   outColor = vec4(1.0, 1.0, 1.0, 1.0);
+  -- }
+  -- @
+  --
+  -- And the output should look like
+  --
+  -- <<demo.png Demo>>
+
+  -- * OpenGL API Basically
+  --
+  -- | <https://www.opengl.org/registry/doc/glspec32.core.20090803.pdf The spec>
+  -- for OpenGL 3.2 is actually quite readable and is worth reviewing.
+  -- The following is my synopsis of things which roughly coincide with the
+  -- simplified OpenGL ES 2.0.
 
   -- ** Objects
   -- | Objects may be created and destroyed by client code. They include:
@@ -159,15 +256,15 @@ module Graphics.GL.Low (
   -- - The __vertex shader__ takes vertex positions as specified in vertex
   -- attributes to clip space. This is how the client code specifies a camera,
   -- movement of objects, and perspective.
-  -- - The __perspective division__ or ""W-divide"" takes vertices from clip space
-  -- and maps them to normalized device coordinates (NDC) by dividing all the
-  -- components of the vertex by that vertex's W component. This allows a
+  -- - The __perspective division__ or ""W-divide"" takes vertices from clip
+  -- space and maps them to normalized device coordinates (NDC) by dividing all
+  -- the components of the vertex by that vertex's W component. This allows a
   -- perspective effect to be accomplished in the shader by modifying the W
   -- components. You can't configure this W-division; it just happens.  Note
-  -- that if W = 1 for all vertices this step has no effect. This is useful for
-  -- orthographic projections. The resulting geometry will be clipped to a
-  -- 2x2x2 cube centered around the origin. You can think of an XY plane of
-  -- this cube as the viewport of the final 2D image.
+  -- that if W = 1 for all vertices then this step has no effect. This is
+  -- useful for orthographic projections. The resulting geometry will be
+  -- clipped to a 2x2x2 cube centered around the origin. You can think of an XY
+  -- plane of this cube as the viewport of the final 2D image.
   -- - The configurable __viewport transformation__ ('setViewport') will then
   -- position the viewport somewhere in the window.  This step is necessary
   -- because your window is probably not a 2x2 square.  The viewport

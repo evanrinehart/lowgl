@@ -87,7 +87,7 @@ drawTriangleFan :: Int -> IO ()
 drawTriangleFan = drawArrays GL_TRIANGLE_FAN
 
 drawArrays :: GLenum -> Int -> IO ()
-drawArrays mode n = glDrawArrays mode (fromIntegral n) 0
+drawArrays mode n = glDrawArrays mode 0 (fromIntegral n)
 
 drawIndexedPoints :: Int -> IndexFormat -> IO ()
 drawIndexedPoints = drawIndexed GL_POINTS
