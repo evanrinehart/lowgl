@@ -10,7 +10,7 @@ name:                lowgl
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.2.0.0
+version:             0.2.0.1
 
 -- A short (one-line) description of the package.
 synopsis:            Basic gl wrapper and reference
@@ -49,6 +49,21 @@ cabal-version:       >=1.10
 library
   -- Modules exported by the library.
   exposed-modules:     Graphics.GL.Low
+                       Graphics.GL.Low.Blending
+                       Graphics.GL.Low.BufferObject
+                       Graphics.GL.Low.Color
+                       Graphics.GL.Low.Classes
+                       Graphics.GL.Low.Cube
+                       Graphics.GL.Low.Depth
+                       Graphics.GL.Low.Error
+                       Graphics.GL.Low.Framebuffer
+                       Graphics.GL.Low.ImageFormat
+                       Graphics.GL.Low.Render
+                       Graphics.GL.Low.Shader
+                       Graphics.GL.Low.Stencil
+                       Graphics.GL.Low.Texture
+                       Graphics.GL.Low.VAO
+                       Graphics.GL.Low.VertexAttrib
   other-modules:       Graphics.GL.Low.Common
   
   -- Modules included in this library but not exported.
@@ -74,4 +89,4 @@ source-repository head
 source-repository this
   type: git
   location: https://github.com/evanrinehart/lowgl
-  tag: 0.2.0.0
+  tag: 0.2.0.1
