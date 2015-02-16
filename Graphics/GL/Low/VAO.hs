@@ -1,3 +1,57 @@
+-- | Vertex Array Objects (VAO). Despite having almost no operations of its
+-- own, the VAO mechanism is one of the most complex pieces of OpenGL. A VAO
+-- has mutable state which associates vertex shader input variables (actually
+-- the integer location of the variable) with three things:
+--
+-- - The VBO to read from.
+-- - The position in the each vertex array (in the VBO) to read from.
+-- - The interpretation of the bytes found there (32-bit float, 16-bit int, etc).
+--
+-- You set these VAO parameters with the following dance:
+--
+-- - Bind a VAO
+-- - Bind a VBO
+-- - Use a Program
+-- - call 'Graphics.GL.Low.VertexAttrib.setVertexAttributeLayout' which will
+-- lookup the position of the input variables and issue the appropriate
+-- glVertexAttribPointer calls.
+--
+-- After a VAO is configured against a Program, either can be swapped in or
+-- out freely and they will still work when both are swapped in again together.
+--
+-- An "in-use" program will use whatever VAO is bound for getting its vertex
+-- inputs. It is up to the programmer to ensure that the VAO has been
+-- configured with the right variable positions for the current program. Two
+-- ways to do this are to use a consistent set of variables for all shaders or
+-- restrict a set of VAOs to only be allowed with specific Program objects.
+--
+-- The currently bound VBO is not remembered or restored by binding a VAO, but
+-- the currently bound ElementArray is. This detail won't affect you if you
+-- always explicitly bind an ElementArray after binding a VAO. Alternatively
+-- you can exploit this to bundle particular models and their element arrays
+-- as a VAO.
+--
+-- Diagram of possible VAO contents:
+--
+-- <<vao.png VAO Diagram>>
+--
+-- The above VAO would be compatible with the following vertex program:
+--
+-- @
+-- #version 150
+-- 
+-- in vec2 position;
+-- in vec3 color;
+--
+-- out vec3 Color;
+-- 
+-- void main()
+-- {
+--     gl_Position = vec4(position, 0.0, 1.0);
+--     Color = color;
+-- }
+-- @
+
 module Graphics.GL.Low.VAO 
 (
   VAO,
@@ -13,9 +67,7 @@ import Graphics.GL
 
 import Graphics.GL.Low.Classes
 
--- | A VAO stores vertex attribute layouts and the VBO source of vertices
--- for those attributes. It also stores the state of the element array binding
--- target. The vertex array binding target admits one VAO at a time.
+-- | Handle to a VAO.
 newtype VAO = VAO GLuint deriving Show
 
 instance GLObject VAO where

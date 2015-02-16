@@ -40,7 +40,7 @@ module Graphics.GL.Low (
   --   GLFW.windowHint (GLFW.WindowHint'ContextVersionMinor 2)
   --   GLFW.windowHint (GLFW.WindowHint'OpenGLForwardCompat True)
   --   GLFW.windowHint (GLFW.WindowHint'OpenGLProfile GLFW.OpenGLProfile'Core)
-  --   mwin <- GLFW.createWindow 640 480 \"Demo\" Nothing Nothing
+  --   mwin <- GLFW.createWindow 640 480 \"Hello World\" Nothing Nothing
   --   case mwin of
   --     Nothing  -> putStrLn "createWindow failed"
   --     Just win -> do
@@ -107,7 +107,7 @@ module Graphics.GL.Low (
   --
   -- And the output should look like
   --
-  -- <<demo.png Demo>>
+  -- <<hello_world.png Hello World>>
 
   -- * OpenGL API Basically
   --
