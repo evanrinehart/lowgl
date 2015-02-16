@@ -33,7 +33,7 @@ The hello world program shows a white triangle on a black background.
 It uses the packages GLFW-b and monad-loops. Note that it forces a
 3.2 core profile when setting up the context through GLFW.
 
-```
+```haskell
 module Main where
 
 import Control.Monad.Loops (whileM_)
@@ -92,7 +92,7 @@ draw vao prog = do
 The vertex shader file looks like
 
 
-```
+```glsl
 #version 150
 
 in vec2 position;
@@ -105,7 +105,7 @@ void main()
 
 And the corresponding fragment shader file
 
-```
+```glsl
 #version 150
 
 out vec4 outColor;
