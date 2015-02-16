@@ -1,7 +1,7 @@
 # lowgl
 
 Use modern but basic OpenGL from Haskell with this wrapper around the amazing
-gl package. The gl package exposes the entire OpenGL API and even
+[gl][1] package. The gl package exposes the entire OpenGL API and even
 auto-configures extensions available on your system. However it is a direct
 translation of the C API, which means all the low level calls require a medium
 amount of FFI negotation. Worse than that is the amount of identifiers that
@@ -27,3 +27,4 @@ API. In short lowgl exists to
 cabal install lowgl
 ```
 
+[1] https://github.com/ekmett/gl
