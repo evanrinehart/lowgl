@@ -24,7 +24,7 @@ import Foreign.Storable
 import Data.Vector.Storable
 import Data.Word
 import Control.Applicative
-import Data.Traversable
+import Data.Traversable (sequenceA)
 
 import Graphics.GL
 

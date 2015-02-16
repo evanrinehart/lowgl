@@ -1,6 +1,38 @@
 {-# LANGUAGE ScopedTypeVariables #-}
--- | VBO and ElementArrays. Both are buffer objects but are used for two
--- different things.
+
+-- | Buffer Objects are objects for holding arbitrary blobs of bytes. This
+-- library exposes two types of buffer objects: VBOs and ElementArrays.
+--
+-- Vertex Buffer Objects (VBO) contain data for a sequence of vertices. A
+-- vertex shader interprets the data for each vertex by mapping the attributes
+-- of the vertex (position, normal vector, etc) to input variables using the
+-- VAO. /VBOs have the data which is used as input to the vertex shader according to the configuration of the VAO/.
+--
+-- Element arrays are buffer objects that contain a sequence of indices. When
+-- using indexed rendering, the bound element array determines the order that
+-- the vertices in the VBOs are visited to construct primitives. This allows
+-- sharing vertices in cases that many vertices overlap with each other. OpenGL
+-- accepts element array objects whose indices are encoded as unsigned bytes,
+-- unsigned 16-bit ints, and unsigned 32-bit ints.
+--
+-- Example VBO contents:
+--
+-- <<vbo.png VBO diagram>>
+--
+-- The shader will interpret those parts of the VBO as illustrated only after
+-- appropiately configuring a VAO. See "Graphics.GL.Low.VAO".
+--
+-- Example ElementArray contents appropriate for render triangles and lines
+-- respectively:
+--
+-- <<element_array.png Element array diagram>>
+--
+-- See 'Graphics.GL.Low.Render.drawIndexedTriangles' and friends to see which
+-- primitives are possible to construct with element arrays. It is not
+-- necessary to use element arrays to render. The non-indexed versions of
+-- the primitive render commands will simply traverse the vertices in order
+-- the order specified in the VBOs.
+
 module Graphics.GL.Low.BufferObject (
   VBO,
   ElementArray,
@@ -26,13 +58,10 @@ import Graphics.GL
 
 import Graphics.GL.Low.Classes
 
--- | A VBO is a buffer object which has vertex data. Shader programs use VBOs
--- as input to their vertex attributes according to the configuration of the
--- bound VAO.
+-- | Handle to a VBO.
 data VBO = VBO GLuint deriving Show
 
--- | A buffer object which has a packed sequence of vertex indices. Indexed
--- rendering uses the ElementArray bound to the element array binding target.
+-- | Handle to an element array buffer object.
 data ElementArray = ElementArray GLuint deriving Show
 
 -- | Usage hint for allocation of buffer object storage.

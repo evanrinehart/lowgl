@@ -1,3 +1,4 @@
+-- | Basic low-level GL wrapper and reference.
 module Graphics.GL.Low (
 
   -- * Overview
