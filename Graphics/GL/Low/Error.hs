@@ -1,6 +1,17 @@
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE PatternSynonyms #-}
-module Graphics.GL.Low.Error where
+
+-- | If you issue an invalid GL command or run out of memory, the GL
+-- implementation may set an internal flag indicating that an error has
+-- occurred. You can query this flag ('getGLError') to see if something went
+-- wrong with a previous command. If you ignore errors, chances are nothing
+-- will happen except perhaps some rendering weirdness. However checking this
+-- periodically is a good idea, perhaps once per frame, because it might
+-- indicate a bug in your code.
+module Graphics.GL.Low.Error (
+  GLError(..),
+  getGLError,
+) where
 
 import Control.Exception
 import Data.Typeable
@@ -25,7 +36,16 @@ instance Show GLError where
   show InvalidFramebufferOperation = "INVALID_FRAMEBUFFER_OPERATION Framebuffer object is not complete"
   show OutOfMemory = "Not enough memory left to execute command"
 
--- | Check for a GL Error.
+-- | Check for a GL Error. This call has the semantics of a dequeue. If an
+-- error is returned, then calling getGLError again may return more errors that
+-- have "stacked up." When it returns Nothing then there are no more errors to
+-- report. An error indicates that a bug in your code caused incorrect ussage
+-- of the API or that the implementation has run out of memory.
+--
+-- It has been suggested that using this after every single GL command may
+-- adversely affect performance (not to mention be very tedious). Since there
+-- is no reasonable way to recover from a GL error, a good idea might be to
+-- check this once per frame or even less often, and respond with a core dump.
 getGLError :: IO (Maybe GLError)
 getGLError = do
   n <- glGetError
