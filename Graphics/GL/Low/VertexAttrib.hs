@@ -116,7 +116,8 @@ setVertexAttributeLayout layout = do
       let total = totalLayout layout
       forM_ layout' $ \(name, size, offset, fmt) -> do
         attrib <- withCString name $ \ptr -> glGetAttribLocation (fromIntegral p) (castPtr ptr)
-        let stride = total - size * sizeOfVertexComponent fmt
+        --let stride = total - size * sizeOfVertexComponent fmt
+        let stride = total
         let norm = isNormalized fmt
         glVertexAttribPointer
           (fromIntegral attrib)

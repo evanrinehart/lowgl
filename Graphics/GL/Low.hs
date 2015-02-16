@@ -146,16 +146,7 @@ module Graphics.GL.Low (
   -- - Image attachment points of an FBO
 
   -- ** Shader Programs
-  -- | The role of the second half of a shader program, the fragment shader, is
-  -- to compute the color and depth of pixels covered by rasterized primitives
-  -- (points, lines, and triangles) in the process of rendering. The role of
-  -- the /first/ half of the program (vertex program) is to arrange the
-  -- vertices of those primitives somewhere in clip space. Where these vertices
-  -- and their attributes come from in the first place is determined by the VAO
-  -- bound to the vertex array binding target. The program may also make use of
-  -- uniform variables and texture units assigned by client code before
-  -- rendering (but in a process completely separate from configuring the VAO).
-  -- At most one Program can be "in use" at a time.
+  -- | See "Graphics.GL.Low.Shader"
 
   -- ** VAO
   -- | The VAO is essential. At least one VAO must be created and bound to the

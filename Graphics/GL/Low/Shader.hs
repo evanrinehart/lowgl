@@ -1,3 +1,39 @@
+-- | A shader program is composed of two cooperating parts: the vertex program
+-- and the fragment program. The vertex program is executed once for each
+-- vertex. The fragment program is executed once for each pixel covered by
+-- a rasterized primitive (actually this is more complicated but close enough).
+--
+-- The inputs to the vertex program are:
+--
+-- - a vertex (see "Graphics.GL.Low.VAO")
+-- - uniforms
+--
+-- The outputs of the vertex program are:
+--
+-- - clip space position of the vertex, gl_Position
+-- - any number of variables matching inputs to the fragment program
+-- - (if rendering a point, then you can set gl_PointSize)
+--
+-- The inputs to the fragment program are:
+--
+-- - the previously mentioned outputs of the vertex program (interpolated)
+-- - the window position of the pixel, gl_FragCoord
+-- - samplers (see "Graphics.GL.Low.Texture")
+-- - uniforms
+-- - gl_FrontFacing, true if pixel is part of a front facing triangle
+-- - (if rendering a point, then you can use gl_PointCoord)
+--
+-- The outputs of the fragment program are:
+--
+-- - a color (this is more complicated in reality but close enough)
+-- - the depth of the pixel, gl_FragDepth, which will default to the pixel's Z.
+--
+--
+-- The output should look like
+--
+-- <<shaders.gif 3 Different Shaders Animated Demo>>
+--
+
 {-# LANGUAGE DeriveDataTypeable #-}
 module Graphics.GL.Low.Shader (
   Program,
@@ -33,11 +69,7 @@ import Linear
 import Graphics.GL.Low.Classes
 import Graphics.GL.Low.VertexAttrib
 
--- | A Program object is the combination of a compiled vertex shader and fragment
--- shader. Programs have three kinds of inputs: vertex attributes, uniforms,
--- and samplers. Programs have two outputs: fragment color and fragment depth.
--- At most one program can be "in use" at a time. Same idea as binding targets
--- it's just not called that.
+-- | Handle to a shader program.
 newtype Program = Program GLuint deriving Show
 
 -- | Either a vertex shader or a fragment shader.
