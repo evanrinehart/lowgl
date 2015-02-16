@@ -27,4 +27,4 @@ API. In short lowgl exists to
 cabal install lowgl
 ```
 
-[1] https://github.com/ekmett/gl
+[1]: https://github.com/ekmett/gl/
