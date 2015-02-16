@@ -37,7 +37,7 @@ It uses the packages GLFW-b and monad-loops. Note that it forces a
 module Main where
 
 import Control.Monad.Loops (whileM_)
-import Data.Functor ((\<$\>))
+import Data.Functor ((<$>))
 import qualified Data.Vector.Storable as V
 
 import qualified Graphics.UI.GLFW as GLFW
@@ -50,14 +50,14 @@ main = do
   GLFW.windowHint (GLFW.WindowHint'ContextVersionMinor 2)
   GLFW.windowHint (GLFW.WindowHint'OpenGLForwardCompat True)
   GLFW.windowHint (GLFW.WindowHint'OpenGLProfile GLFW.OpenGLProfile'Core)
-  mwin <- GLFW.createWindow 640 480 \"Hello World\" Nothing Nothing
+  mwin <- GLFW.createWindow 640 480 "Hello World" Nothing Nothing
   case mwin of
     Nothing  -> putStrLn "createWindow failed"
     Just win -> do
       GLFW.makeContextCurrent (Just win)
       GLFW.swapInterval 1
       (vao, prog) <- setup -- load and configure objects
-      whileM_ (not \<$\> GLFW.windowShouldClose win) $ do
+      whileM_ (not <$> GLFW.windowShouldClose win) $ do
         GLFW.pollEvents
         draw vao prog -- render
         GLFW.swapBuffers win
