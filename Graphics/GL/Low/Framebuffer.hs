@@ -1,16 +1,48 @@
+-- | Framebuffers, FBO, RBO...
+--
+-- == Example
+--
+-- This example program renders an animating object to an off-screen
+-- framebuffer. The resulting texture is then show on a full-screen quad
+-- with an effect.
+--
+-- @
+--
+-- @
+--
+-- The vertex shader for this program is
+--
+-- @
+--
+-- @
+--
+-- The two fragment shaders, one for the object, one for the effect, are
+--
+-- @
+--
+-- @
+--
+-- @
+--
+-- @
+--
+-- And the output looks like
+--
+-- <<framebuffer.gif Animated screenshot showing post-processing effect>>
+
 {-# LANGUAGE RankNTypes #-}
 module Graphics.GL.Low.Framebuffer (
-  FBO,
-  RBO,
-  DefaultFramebuffer(..),
-  bindFramebuffer,
   newFBO,
+  bindFramebuffer,
   deleteFBO,
   attachTex2D,
   attachCubeMap,
   attachRBO,
   newRBO,
-  deleteRBO
+  deleteRBO,
+  FBO,
+  DefaultFramebuffer(..),
+  RBO,
 ) where
 
 import Foreign.Ptr
