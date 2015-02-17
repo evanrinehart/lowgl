@@ -428,7 +428,7 @@ module Graphics.GL.Low (
 
   -- * Framebuffers
   -- | See also "Graphics.GL.Low.Framebuffer"
-  DefaultFramebuffer,
+  DefaultFramebuffer(..),
   FBO,
   bindFramebuffer,
   newFBO,

@@ -2,7 +2,7 @@
 module Graphics.GL.Low.Framebuffer (
   FBO,
   RBO,
-  DefaultFramebuffer,
+  DefaultFramebuffer(..),
   bindFramebuffer,
   newFBO,
   deleteFBO,
@@ -35,8 +35,7 @@ newtype FBO = FBO GLuint deriving Show
 -- you can do with an RBO is attach it to an FBO.
 data RBO a = RBO { unRBO :: GLuint } deriving Show
 
--- | The default framebuffer. Bind this to render to the screen as usual.
--- Use the Default instance method 'def' to construct it.
+-- | The default framebuffer.
 data DefaultFramebuffer = DefaultFramebuffer deriving Show
 
 instance Default DefaultFramebuffer where

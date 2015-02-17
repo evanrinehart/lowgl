@@ -26,7 +26,7 @@ data Depth24 = Depth24 deriving Show
 data Depth24Stencil8 = Depth24Stencil8 deriving Show
 
 instance InternalFormat RGB where
-  internalFormat _ = GL_RGB8
+  internalFormat _ = GL_RGB
 instance InternalFormat RGBA where
   internalFormat _ = GL_RGBA
 instance InternalFormat Alpha where
