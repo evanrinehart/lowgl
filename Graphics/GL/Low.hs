@@ -70,7 +70,7 @@ module Graphics.GL.Low (
   --   vbo <- newVBO blob StaticDraw
   --   bindVBO vbo
   --   -- connect program to vertex data via the VAO
-  --   setVertexAttributeLayout [Attrib "position" 2 VFloat]
+  --   setVertexLayout [Attrib "position" 2 GLFloat]
   --   return (vao, prog)
   -- 
   -- draw vao prog = do
@@ -159,7 +159,7 @@ module Graphics.GL.Low (
   --
   -- After installing a program with 'useProgram' and binding a source VBO
   -- to the array buffer binding target ('bindVBO') then the bound VAO can be
-  -- updated ('setVertexAttributeLayout') with new vertex attribute information.
+  -- updated ('setVertexLayout') with new vertex attribute information.
   -- After this, the VBO can be rebound to configure a different set of inputs
   -- with a different source. Many VAOs can be created and swapped out to pipe
   -- vertex data in different ways to different programs (or the same program).
@@ -327,10 +327,9 @@ module Graphics.GL.Low (
 
   -- ** Vertex Attributes
   -- | See also "Graphics.GL.Low.VertexAttrib"
-  setVertexAttributeLayout,
-  VertexAttributeLayout(..),
-  LayoutElement(..),
-  ComponentFormat(..),
+  setVertexLayout,
+  VertexLayout(..),
+  DataType(..),
 
 
   -- * Textures

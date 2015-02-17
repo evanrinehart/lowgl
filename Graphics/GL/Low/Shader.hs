@@ -78,9 +78,9 @@
 --         ,  0.4, -0.4, 1, 1] :: V.Vector Float
 --   vbo <- newVBO blob StaticDraw
 --   bindVBO vbo
---   setVertexAttributeLayout
---     [ Attrib "position" 2 VFloat
---     , Attrib "location" 2 VFloat ]
+--   setVertexLayout
+--     [ Attrib "position" 2 GLFloat
+--     , Attrib "location" 2 GLFloat ]
 --   return (vao, prog1, prog2, prog3)
 -- 
 -- draw vao prog1 prog2 prog3 t = do

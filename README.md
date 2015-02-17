@@ -66,7 +66,7 @@ setup = do
   vbo <- newVBO blob StaticDraw
   bindVBO vbo
   -- connect program to vertex data via the VAO
-  setVertexAttributeLayout [Attrib "position" 2 VFloat]
+  setVertexLayout [Attrib "position" 2 GLFloat]
   return (vao, prog)
 
 draw vao prog = do

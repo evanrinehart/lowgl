@@ -12,7 +12,7 @@
 -- - Bind a VAO
 -- - Bind a VBO
 -- - Use a Program
--- - call 'Graphics.GL.Low.VertexAttrib.setVertexAttributeLayout' which will
+-- - call 'Graphics.GL.Low.VertexAttrib.setVertexLayout' which will
 -- lookup the position of the input variables and issue the appropriate
 -- glVertexAttribPointer calls.
 --

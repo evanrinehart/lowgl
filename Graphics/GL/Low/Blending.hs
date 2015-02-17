@@ -60,7 +60,7 @@
 --         , -0.5, -0.5 ] :: V.Vector Float
 --   vbo <- newVBO blob StaticDraw
 --   bindVBO vbo
---   setVertexAttributeLayout [Attrib "position" 2 VFloat]
+--   setVertexLayout [Attrib "position" 2 GLFloat]
 --   enableBlending basicBlending
 --   return (vao, prog)
 -- 
