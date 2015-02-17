@@ -14,6 +14,10 @@
 --
 -- == Example
 --
+-- This example loads a 256x256 PNG file with JuicyPixels and displays the
+-- image on a square. Of course without a correction for aspect ratio the
+-- square will only be square if you adjust your window to be square.
+--
 -- @
 -- module Main where
 -- 
