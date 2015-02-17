@@ -445,6 +445,7 @@ module Graphics.GL.Low (
   -- * Errors
   GLError(..),
   getGLError,
+  assertNoGLError,
 
   -- * Image Formats
   Alpha,

@@ -11,6 +11,7 @@
 module Graphics.GL.Low.Error (
   GLError(..),
   getGLError,
+  assertNoGLError,
 ) where
 
 import Control.Exception
@@ -57,3 +58,11 @@ getGLError = do
     GL_INVALID_FRAMEBUFFER_OPERATION -> Just InvalidFramebufferOperation
     GL_OUT_OF_MEMORY -> Just OutOfMemory
     _ -> error ("unknown GL error " ++ show n)
+
+-- | Throws an exception if 'getGLError' returns non-Nothing.
+assertNoGLError :: IO ()
+assertNoGLError = do
+  me <- getGLError
+  case me of
+    Nothing -> return ()
+    Just e  -> throwIO e
