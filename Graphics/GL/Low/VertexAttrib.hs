@@ -43,8 +43,7 @@ data VertexLayout =
   Unused Int -- ^ Size in bytes of an unused section of the vertex data.
     deriving Show
 
--- | The size and interpretation of a vertex attribute component. Normalized
--- components will be mapped to floats in the range [0, 1].
+-- | The size and interpretation of a vertex attribute component.
 data DataType =
   GLFloat         | -- ^ 4-byte float
   GLUnsignedByte  | -- ^ unsigned byte
