@@ -46,8 +46,8 @@ data VertexLayout =
 -- | The size and interpretation of a vertex attribute component.
 data DataType =
   GLFloat         | -- ^ 4-byte float
-  GLUnsignedByte  | -- ^ unsigned byte
   GLByte          | -- ^ signed byte
+  GLUnsignedByte  | -- ^ unsigned byte
   GLShort         | -- ^ 2-byte signed integer
   GLUnsignedShort | -- ^ 2-byte unsigned integer
   GLInt           | -- ^ 4-byte signed integer
