@@ -16,13 +16,16 @@
 -- - When the stencil test fails or
 -- - When the stencil test passes then the depth test fails or
 -- - When both tests pass.
---
--- An example way of updating the stencil buffer is to write zero, or to write
--- the ref value mentioned above to the location being tested.
---
--- > example program here
 
-module Graphics.GL.Low.Stencil where
+module Graphics.GL.Low.Stencil (
+  enableStencil,
+  disableStencil,
+  clearStencilBuffer,
+  basicStencil,
+  Stencil(..),
+  StencilFunc(..),
+  StencilOp(..)
+) where
 
 import Data.Default
 import Data.Bits
