@@ -1,3 +1,5 @@
+module Graphics.GL.Low.Stencil (
+
 -- | The stencil test is like a configurable depth test with a dedicated
 -- additional buffer. Like the depth test, if the stencil test fails then the
 -- pixel being tested will not be rendered. The stencil test happens before the
@@ -17,7 +19,6 @@
 -- - When the stencil test passes then the depth test fails or
 -- - When both tests pass.
 
-module Graphics.GL.Low.Stencil (
   enableStencil,
   disableStencil,
   clearStencilBuffer,

@@ -1,3 +1,6 @@
+
+module Graphics.GL.Low.VAO (
+
 -- | Vertex Array Objects (VAO). Despite having almost no operations of its
 -- own, the VAO mechanism is one of the most complex pieces of OpenGL. A VAO
 -- has mutable state which associates vertex shader input variables (actually
@@ -52,12 +55,10 @@
 -- }
 -- @
 
-module Graphics.GL.Low.VAO 
-(
-  VAO,
   newVAO,
   deleteVAO,
-  bindVAO
+  bindVAO,
+  VAO
 ) where
 
 import Foreign.Storable

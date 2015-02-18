@@ -303,7 +303,6 @@ module Graphics.GL.Low (
   VBO,
   ElementArray,
   UsageHint(..),
-  IndexFormat(..),
 
   -- * Shader Program
   -- | See also "Graphics.GL.Low.Shader"
@@ -355,12 +354,9 @@ module Graphics.GL.Low (
   Wrapping(..),
 
   -- * Rendering
-  -- | See also "Graphics.GL.Low.Render"
-
+  --
   -- ** Primitives
-  -- | Draw primitives to the framebuffer currently bound to the framebuffer
-  -- binding target. Each primitive drawing command takes the number of vertices
-  -- in the VBOs to render. The vertices are traversed in order.
+  -- | See also "Graphics.GL.Low.Render"
   drawPoints,
   drawLines,
   drawLineStrip,
@@ -368,11 +364,6 @@ module Graphics.GL.Low (
   drawTriangles,
   drawTriangleStrip,
   drawTriangleFan,
-
-  -- ** Primitives by Index
-  -- | Draw primitives as above, but use the order of vertices defined in
-  -- the ElementArray currently bound to the element array buffer binding
-  -- target.
   drawIndexedPoints,
   drawIndexedLines,
   drawIndexedLineStrip,
@@ -380,6 +371,14 @@ module Graphics.GL.Low (
   drawIndexedTriangles,
   drawIndexedTriangleStrip,
   drawIndexedTriangleFan,
+  setViewport,
+  enableScissorTest,
+  disableScissorTest,
+  enableCulling,
+  disableCulling,
+  Viewport(..),
+  Culling(..),
+  IndexFormat(..),
 
   -- ** Color Buffer
   -- | See also "Graphics.GL.Low.Color"
@@ -403,15 +402,6 @@ module Graphics.GL.Low (
   StencilFunc(..),
   StencilOp(..),
 
-  -- ** Scissor Test
-  enableScissorTest,
-  disableScissorTest,
-
-  -- ** Facet Culling
-  Culling(..),
-  enableCulling,
-  disableCulling,
-
   -- ** Blending
   -- | See also "Graphics.GL.Low.Blending".
 
@@ -421,10 +411,6 @@ module Graphics.GL.Low (
   Blending(..),
   BlendFactor(..),
   BlendEquation(..),
-
-  -- ** Viewport
-  Viewport(..),
-  setViewport,
 
   -- * Framebuffers
   -- | See also "Graphics.GL.Low.Framebuffer"

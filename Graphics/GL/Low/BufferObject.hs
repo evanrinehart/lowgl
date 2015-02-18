@@ -2,13 +2,16 @@
 
 -- | Buffer Objects are objects for holding arbitrary blobs of bytes. This
 -- library exposes two types of buffer objects: VBOs and ElementArrays.
---
--- = VBO
---
--- Vertex Buffer Objects (VBO) contain data for a sequence of vertices. A
+
+module Graphics.GL.Low.BufferObject (
+
+-- * VBO
+
+-- | Vertex Buffer Objects (VBO) contain data for a sequence of vertices. A
 -- vertex shader interprets the data for each vertex by mapping the attributes
 -- of the vertex (position, normal vector, etc) to input variables using the
--- VAO. /VBOs have the data which is used as input to the vertex shader according to the configuration of the VAO/.
+-- VAO. VBOs have the data which is used as input to the vertex shader
+-- according to the configuration of the VAO/.
 --
 -- Example VBO contents:
 --
@@ -16,10 +19,10 @@
 --
 -- The shader will interpret those parts of the VBO as illustrated only after
 -- appropiately configuring a VAO. See "Graphics.GL.Low.VAO".
---
--- = ElementArray
---
--- Element arrays are buffer objects that contain a sequence of indices. When
+
+-- * ElementArray
+
+-- | Element arrays are buffer objects that contain a sequence of indices. When
 -- using indexed rendering, the bound element array determines the order that
 -- the vertices in the VBOs are visited to construct primitives. This allows
 -- sharing vertices in cases that many vertices overlap with each other. OpenGL
@@ -37,17 +40,18 @@
 -- the primitive render commands will simply traverse the vertices in order
 -- specified in the VBOs.
 
-module Graphics.GL.Low.BufferObject (
-  VBO,
-  ElementArray,
-  UsageHint(..),
+-- * Documentation
+
   newVBO,
   updateVBO,
   bindVBO,
   newElementArray,
   updateElementArray,
   bindElementArray,
-  deleteBufferObject
+  deleteBufferObject,
+  VBO,
+  ElementArray,
+  UsageHint(..)
 ) where
 
 import Foreign.Ptr

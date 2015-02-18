@@ -1,3 +1,6 @@
+
+{-# LANGUAGE DeriveDataTypeable #-}
+module Graphics.GL.Low.Shader (
 -- | A shader program is composed of two cooperating parts: the vertex program
 -- and the fragment program. The vertex program is executed once for each
 -- vertex. The fragment program is executed once for each pixel covered by
@@ -28,159 +31,10 @@
 -- - a color (this is more complicated in reality but close enough)
 -- - the depth of the pixel, gl_FragDepth, which will default to the pixel's Z.
 --
--- = Example
---
--- @
--- module Main where
--- 
--- import Control.Monad.Loops (whileM_)
--- import Data.Functor ((\<$\>))
--- import qualified Data.Vector.Storable as V
--- import Data.Maybe (fromJust)
--- 
--- import qualified Graphics.UI.GLFW as GLFW
--- import Linear
--- import Graphics.GL.Low
--- 
--- main = do
---   GLFW.init
---   GLFW.windowHint (GLFW.WindowHint'ContextVersionMajor 3)
---   GLFW.windowHint (GLFW.WindowHint'ContextVersionMinor 2)
---   GLFW.windowHint (GLFW.WindowHint'OpenGLForwardCompat True)
---   GLFW.windowHint (GLFW.WindowHint'OpenGLProfile GLFW.OpenGLProfile'Core)
---   mwin <- GLFW.createWindow 640 480 \"Shaders\" Nothing Nothing
---   case mwin of
---     Nothing  -> putStrLn "createWindow failed"
---     Just win -> do
---       GLFW.makeContextCurrent (Just win)
---       GLFW.swapInterval 1
---       (vao, prog1, prog2, prog3) <- setup
---       whileM_ (not \<$\> GLFW.windowShouldClose win) $ do
---         GLFW.pollEvents
---         t <- (realToFrac . fromJust) \<$\> GLFW.getTime
---         draw vao prog1 prog2 prog3 t
---         GLFW.swapBuffers win
--- 
--- setup = do
---   vao <- newVAO
---   bindVAO vao
---   vsource <- readFile "shader.vert"
---   fsource1 <- readFile "shader1.frag"
---   fsource2 <- readFile "shader2.frag"
---   fsource3 <- readFile "shader3.frag"
---   prog1 <- newProgram vsource fsource1
---   prog2 <- newProgram vsource fsource2
---   prog3 <- newProgram vsource fsource3
---   useProgram prog1
---   let blob = V.fromList
---         [ -0.4, -0.4, 0, 0
---         ,  0,    0.4, 0, 1
---         ,  0.4, -0.4, 1, 1] :: V.Vector Float
---   vbo <- newVBO blob StaticDraw
---   bindVBO vbo
---   setVertexLayout
---     [ Attrib "position" 2 GLFloat
---     , Attrib "location" 2 GLFloat ]
---   return (vao, prog1, prog2, prog3)
--- 
--- draw vao prog1 prog2 prog3 t = do
---   clearColorBuffer (0,0,0)
---   bindVAO vao
---   drawThing prog1 t (V3 (-0.5)   0.5    0.0)
---   drawThing prog2 t (V3   0.5    0.5    0.0)
---   drawThing prog3 t (V3   0.0  (-0.5) (-0.0))
--- 
--- drawThing :: Program -> Float -> V3 Float -> IO ()
--- drawThing prog t shift = do
---   let angle = t / 5
---   let move = mkTransformation (axisAngle (V3 0 0 1) angle) shift
---   useProgram prog
---   setUniform1f "time" [t]
---   setUniform44 "move" [transpose move]
---   drawTriangles 3
--- @
---
--- Where the vertex shader is
---
--- @
--- #version 150
--- uniform mat4 move;
--- in vec2 position;
--- in vec2 location;
--- out vec2 Location;
--- void main()
--- {
---     gl_Position = move * vec4(position, 0.0, 1.0);
---     Location = location;
--- }
--- @
---
--- And the three fragment shaders are
---
--- @
--- #version 150
--- uniform float time;
--- in vec2 Location;
--- out vec4 outColor;
--- void main()
--- {
---   float x = gl_FragCoord.x / 640;
---   float y = gl_FragCoord.y / 480;
---   outColor = vec4(
---     fract(x*25) < 0.5 ? 1.0 : 0.0,
---     fract(y*25) < 0.5 ? 1.0 : 0.0,
---     0.0, 1.0
---   );
--- }
--- @
---
--- @
--- #version 150
--- uniform float time;
--- in vec2 Location;
--- out vec4 outColor;
--- void main()
--- {
---   outColor = vec4(
---     fract(Location.x*10) < 0.5 ? 1.0 : 0.0,
---     fract(Location.y*10) < 0.5 ? 1.0 : 0.0,
---     0.0, 1.0
---   );
--- }
--- @
---
--- @
--- #version 150
--- uniform float time;
--- in vec2 Location;
--- out vec4 outColor;
--- void main()
--- {
---   float t = time;
---   outColor = vec4(
---     fract(Location.x*5) < 0.5 ? sin(t*3.145) : cos(t*4.567),
---     fract(Location.y*5) < 0.5 ? cos(t*6.534) : sin(t*4.321),
---     0.0, 1.0
---   );
--- }
--- @
---
--- The output should look like
---
--- <<shaders.gif 3 Different Shaders Animated Demo>>
---
--- Where the window coordinates, the interpolated location on the triangle,
--- and the elapsed time are used to color the triangle respectively.
---
-
-{-# LANGUAGE DeriveDataTypeable #-}
-module Graphics.GL.Low.Shader (
-  Program,
-  ProgramError(..),
-  newProgramSafe,
-  deleteProgram,
   newProgram,
+  newProgramSafe,
   useProgram,
+  deleteProgram,
   setUniform1f,
   setUniform2f,
   setUniform3f,
@@ -191,7 +45,12 @@ module Graphics.GL.Low.Shader (
   setUniform4i,
   setUniform44,
   setUniform33,
-  setUniform22
+  setUniform22,
+  Program,
+  ProgramError(..)
+
+  -- * Example
+  -- $example
 ) where
 
 import Foreign.Ptr
@@ -345,3 +204,145 @@ setUniform glAction name xs = withArrayLen xs $ \n bytes -> do
         else glAction loc (fromIntegral n) bytes
 
 
+-- $example
+--
+-- <<shaders.gif 3 Different Shaders Animated Demo>>
+--
+-- This example renders three differently-shaded triangles. The window
+-- coordinates, the interpolated location on the triangle, and the elapsed time
+-- are used to color the triangles respectively.
+--
+-- @
+-- module Main where
+-- 
+-- import Control.Monad.Loops (whileM_)
+-- import Data.Functor ((\<$\>))
+-- import qualified Data.Vector.Storable as V
+-- import Data.Maybe (fromJust)
+-- 
+-- import qualified Graphics.UI.GLFW as GLFW
+-- import Linear
+-- import Graphics.GL.Low
+-- 
+-- main = do
+--   GLFW.init
+--   GLFW.windowHint (GLFW.WindowHint'ContextVersionMajor 3)
+--   GLFW.windowHint (GLFW.WindowHint'ContextVersionMinor 2)
+--   GLFW.windowHint (GLFW.WindowHint'OpenGLForwardCompat True)
+--   GLFW.windowHint (GLFW.WindowHint'OpenGLProfile GLFW.OpenGLProfile'Core)
+--   mwin <- GLFW.createWindow 640 480 \"Shaders\" Nothing Nothing
+--   case mwin of
+--     Nothing  -> putStrLn "createWindow failed"
+--     Just win -> do
+--       GLFW.makeContextCurrent (Just win)
+--       GLFW.swapInterval 1
+--       (vao, prog1, prog2, prog3) <- setup
+--       whileM_ (not \<$\> GLFW.windowShouldClose win) $ do
+--         GLFW.pollEvents
+--         t <- (realToFrac . fromJust) \<$\> GLFW.getTime
+--         draw vao prog1 prog2 prog3 t
+--         GLFW.swapBuffers win
+-- 
+-- setup = do
+--   vao <- newVAO
+--   bindVAO vao
+--   vsource <- readFile "shader.vert"
+--   fsource1 <- readFile "shader1.frag"
+--   fsource2 <- readFile "shader2.frag"
+--   fsource3 <- readFile "shader3.frag"
+--   prog1 <- newProgram vsource fsource1
+--   prog2 <- newProgram vsource fsource2
+--   prog3 <- newProgram vsource fsource3
+--   useProgram prog1
+--   let blob = V.fromList
+--         [ -0.4, -0.4, 0, 0
+--         ,  0,    0.4, 0, 1
+--         ,  0.4, -0.4, 1, 1] :: V.Vector Float
+--   vbo <- newVBO blob StaticDraw
+--   bindVBO vbo
+--   setVertexLayout
+--     [ Attrib "position" 2 GLFloat
+--     , Attrib "location" 2 GLFloat ]
+--   return (vao, prog1, prog2, prog3)
+-- 
+-- draw vao prog1 prog2 prog3 t = do
+--   clearColorBuffer (0,0,0)
+--   bindVAO vao
+--   drawThing prog1 t (V3 (-0.5)   0.5    0.0)
+--   drawThing prog2 t (V3   0.5    0.5    0.0)
+--   drawThing prog3 t (V3   0.0  (-0.5) (-0.0))
+-- 
+-- drawThing :: Program -> Float -> V3 Float -> IO ()
+-- drawThing prog t shift = do
+--   let angle = t / 5
+--   let move = mkTransformation (axisAngle (V3 0 0 1) angle) shift
+--   useProgram prog
+--   setUniform1f "time" [t]
+--   setUniform44 "move" [transpose move]
+--   drawTriangles 3
+-- @
+--
+-- Where the vertex shader is
+--
+-- @
+-- #version 150
+-- uniform mat4 move;
+-- in vec2 position;
+-- in vec2 location;
+-- out vec2 Location;
+-- void main()
+-- {
+--     gl_Position = move * vec4(position, 0.0, 1.0);
+--     Location = location;
+-- }
+-- @
+--
+-- And the three fragment shaders are
+--
+-- @
+-- #version 150
+-- uniform float time;
+-- in vec2 Location;
+-- out vec4 outColor;
+-- void main()
+-- {
+--   float x = gl_FragCoord.x / 640;
+--   float y = gl_FragCoord.y / 480;
+--   outColor = vec4(
+--     fract(x*25) < 0.5 ? 1.0 : 0.0,
+--     fract(y*25) < 0.5 ? 1.0 : 0.0,
+--     0.0, 1.0
+--   );
+-- }
+-- @
+--
+-- @
+-- #version 150
+-- uniform float time;
+-- in vec2 Location;
+-- out vec4 outColor;
+-- void main()
+-- {
+--   outColor = vec4(
+--     fract(Location.x*10) < 0.5 ? 1.0 : 0.0,
+--     fract(Location.y*10) < 0.5 ? 1.0 : 0.0,
+--     0.0, 1.0
+--   );
+-- }
+-- @
+--
+-- @
+-- #version 150
+-- uniform float time;
+-- in vec2 Location;
+-- out vec4 outColor;
+-- void main()
+-- {
+--   float t = time;
+--   outColor = vec4(
+--     fract(Location.x*5) < 0.5 ? sin(t*3.145) : cos(t*4.567),
+--     fract(Location.y*5) < 0.5 ? cos(t*6.534) : sin(t*4.321),
+--     0.0, 1.0
+--   );
+-- }
+-- @

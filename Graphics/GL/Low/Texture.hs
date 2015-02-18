@@ -1,3 +1,5 @@
+module Graphics.GL.Low.Texture (
+
 -- | Textures are objects that contain image data that can be sampled by
 -- a shader. While an obvious application of this is texture mapping, there
 -- are many other uses for textures (the image data doesn't have to be an
@@ -11,113 +13,7 @@
 -- points to by setting it using the 'Graphics.GL.Low.Shader.setUniform1i'
 -- command. You can avoid dealing with active texture units if theres only one
 -- sampler because the default unit is zero.
---
--- == Example
---
--- This example loads a 256x256 PNG file with JuicyPixels and displays the
--- image on a square. Of course without a correction for aspect ratio the
--- square will only be square if you adjust your window to be square.
---
--- @
--- module Main where
--- 
--- import Control.Monad.Loops (whileM_)
--- import Data.Functor ((\<$\>))
--- import qualified Data.Vector.Storable as V
--- import Codec.Picture
--- import Data.Word
--- 
--- import qualified Graphics.UI.GLFW as GLFW
--- import Linear
--- import Graphics.GL.Low
--- 
--- main = do
---   GLFW.init
---   GLFW.windowHint (GLFW.WindowHint'ContextVersionMajor 3)
---   GLFW.windowHint (GLFW.WindowHint'ContextVersionMinor 2)
---   GLFW.windowHint (GLFW.WindowHint'OpenGLForwardCompat True)
---   GLFW.windowHint (GLFW.WindowHint'OpenGLProfile GLFW.OpenGLProfile'Core)
---   mwin <- GLFW.createWindow 640 480 \"Texture\" Nothing Nothing
---   case mwin of
---     Nothing  -> putStrLn "createWindow failed"
---     Just win -> do
---       GLFW.makeContextCurrent (Just win)
---       GLFW.swapInterval 1
---       (vao, prog, texture) <- setup
---       whileM_ (not \<$\> GLFW.windowShouldClose win) $ do
---         GLFW.pollEvents
---         draw vao prog texture
---         GLFW.swapBuffers win
--- 
--- setup = do
---   -- establish a VAO
---   vao <- newVAO
---   bindVAO vao
---   -- load the shader
---   vsource <- readFile "texture.vert"
---   fsource <- readFile "texture.frag"
---   prog <- newProgram vsource fsource
---   useProgram prog
---   -- load the vertices
---   let blob = V.fromList -- a quad has four vertices
---         [ -0.5, -0.5, 0, 1
---         , -0.5,  0.5, 0, 0
---         ,  0.5, -0.5, 1, 1
---         ,  0.5,  0.5, 1, 0 ] :: V.Vector Float
---   vbo <- newVBO blob StaticDraw
---   bindVBO vbo
---   setVertexLayout [ Attrib "position" 2 GLFloat
---                   , Attrib "texcoord" 2 GLFloat ]
---   -- load the element array to draw a quad with two triangles
---   indices <- newElementArray (V.fromList [0,1,2,3,2,1] :: V.Vector Word8) StaticDraw
---   bindElementArray indices
---   -- load the texture with JuicyPixels
---   let fromRight (Right x) = x
---   ImageRGBA8 (Image w h image) <- fromRight \<$\> readImage "logo.png"
---   texture <- newTexture2D image (Dimensions w h) :: IO (Tex2D RGBA)
---   setTex2DFiltering Linear
---   return (vao, prog, texture)
--- 
--- draw vao prog texture = do
---   clearColorBuffer (0.5, 0.5, 0.5)
---   bindVAO vao
---   useProgram prog
---   bindTexture2D texture
---   drawIndexedTriangles 6 UByteIndices
--- @
---
--- The vertex shader for this example looks like
---
--- @
--- #version 150
--- in vec2 position;
--- in vec2 texcoord;
--- out vec2 Texcoord;
--- void main()
--- {
---     gl_Position = vec4(position, 0.0, 1.0);
---     Texcoord = texcoord;
--- }
--- @
---
--- And the fragment shader looks like
---
--- @
--- #version 150
--- in vec2 Texcoord;
--- out vec4 outColor;
--- uniform sampler2D tex;
--- void main()
--- {
---   outColor = texture(tex, Texcoord);
--- }
--- @
---
--- Should produce output like
---
--- <<texture.png Screenshot of Texture Example>>
 
-module Graphics.GL.Low.Texture (
   newTexture2D,
   newCubeMap,
   newEmptyTexture2D,
@@ -134,7 +30,11 @@ module Graphics.GL.Low.Texture (
   CubeMap,
   Filtering(..),
   Wrapping(..),
-  Dimensions(..),
+  Dimensions(..)
+
+  -- * Example
+  -- $example
+
 ) where
 
 import Foreign.Ptr
@@ -330,3 +230,106 @@ instance GLObject (Tex2D a) where
 
 instance GLObject (CubeMap a) where
   glObjectName (CubeMap n) = fromIntegral n
+
+-- $example
+--
+-- <<texture.png Screenshot of Texture Example>>
+--
+-- This example loads a 256x256 PNG file with JuicyPixels and displays the
+-- image on a square. Of course without a correction for aspect ratio the
+-- square will only be square if you adjust your window to be square.
+--
+-- @
+-- module Main where
+-- 
+-- import Control.Monad.Loops (whileM_)
+-- import Data.Functor ((\<$\>))
+-- import qualified Data.Vector.Storable as V
+-- import Codec.Picture
+-- import Data.Word
+-- 
+-- import qualified Graphics.UI.GLFW as GLFW
+-- import Linear
+-- import Graphics.GL.Low
+-- 
+-- main = do
+--   GLFW.init
+--   GLFW.windowHint (GLFW.WindowHint'ContextVersionMajor 3)
+--   GLFW.windowHint (GLFW.WindowHint'ContextVersionMinor 2)
+--   GLFW.windowHint (GLFW.WindowHint'OpenGLForwardCompat True)
+--   GLFW.windowHint (GLFW.WindowHint'OpenGLProfile GLFW.OpenGLProfile'Core)
+--   mwin <- GLFW.createWindow 640 480 \"Texture\" Nothing Nothing
+--   case mwin of
+--     Nothing  -> putStrLn "createWindow failed"
+--     Just win -> do
+--       GLFW.makeContextCurrent (Just win)
+--       GLFW.swapInterval 1
+--       (vao, prog, texture) <- setup
+--       whileM_ (not \<$\> GLFW.windowShouldClose win) $ do
+--         GLFW.pollEvents
+--         draw vao prog texture
+--         GLFW.swapBuffers win
+-- 
+-- setup = do
+--   -- establish a VAO
+--   vao <- newVAO
+--   bindVAO vao
+--   -- load the shader
+--   vsource <- readFile "texture.vert"
+--   fsource <- readFile "texture.frag"
+--   prog <- newProgram vsource fsource
+--   useProgram prog
+--   -- load the vertices
+--   let blob = V.fromList -- a quad has four vertices
+--         [ -0.5, -0.5, 0, 1
+--         , -0.5,  0.5, 0, 0
+--         ,  0.5, -0.5, 1, 1
+--         ,  0.5,  0.5, 1, 0 ] :: V.Vector Float
+--   vbo <- newVBO blob StaticDraw
+--   bindVBO vbo
+--   setVertexLayout [ Attrib "position" 2 GLFloat
+--                   , Attrib "texcoord" 2 GLFloat ]
+--   -- load the element array to draw a quad with two triangles
+--   indices <- newElementArray (V.fromList [0,1,2,3,2,1] :: V.Vector Word8) StaticDraw
+--   bindElementArray indices
+--   -- load the texture with JuicyPixels
+--   let fromRight (Right x) = x
+--   ImageRGBA8 (Image w h image) <- fromRight \<$\> readImage "logo.png"
+--   texture <- newTexture2D image (Dimensions w h) :: IO (Tex2D RGBA)
+--   setTex2DFiltering Linear
+--   return (vao, prog, texture)
+-- 
+-- draw vao prog texture = do
+--   clearColorBuffer (0.5, 0.5, 0.5)
+--   bindVAO vao
+--   useProgram prog
+--   bindTexture2D texture
+--   drawIndexedTriangles 6 UByteIndices
+-- @
+--
+-- The vertex shader for this example looks like
+--
+-- @
+-- #version 150
+-- in vec2 position;
+-- in vec2 texcoord;
+-- out vec2 Texcoord;
+-- void main()
+-- {
+--     gl_Position = vec4(position, 0.0, 1.0);
+--     Texcoord = texcoord;
+-- }
+-- @
+--
+-- And the fragment shader looks like
+--
+-- @
+-- #version 150
+-- in vec2 Texcoord;
+-- out vec4 outColor;
+-- uniform sampler2D tex;
+-- void main()
+-- {
+--   outColor = texture(tex, Texcoord);
+-- }
+-- @

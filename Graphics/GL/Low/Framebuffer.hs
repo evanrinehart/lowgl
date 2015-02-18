@@ -1,3 +1,6 @@
+{-# LANGUAGE RankNTypes #-}
+module Graphics.GL.Low.Framebuffer (
+
 -- | By default, rendering commands output graphics to the default framebuffer.
 -- This includes the color buffer, the depth buffer, and the stencil buffer. It
 -- is possible to render to a texture instead. This is important for many
@@ -22,9 +25,7 @@
 -- if present. An FBO must have a color attachment before rendering. If only
 -- the depth results are needed, then you can attach a color RBO instead of
 -- a texture to the color attachment point.
---
-{-# LANGUAGE RankNTypes #-}
-module Graphics.GL.Low.Framebuffer (
+
   newFBO,
   bindFramebuffer,
   deleteFBO,
@@ -37,6 +38,7 @@ module Graphics.GL.Low.Framebuffer (
   DefaultFramebuffer(..),
   RBO
 
+  -- * Example
   -- $example
  
 ) where
@@ -144,7 +146,8 @@ deleteRBO (RBO n) = withArray [n] (\ptr -> glDeleteRenderbuffers 1 ptr)
 
 
 -- $example
--- == Example
+--
+-- <<framebuffer.gif Animated screenshot showing post-processing effect>>
 --
 -- This example program renders an animating object to an off-screen
 -- framebuffer. The resulting texture is then shown on a full-screen quad
@@ -294,8 +297,3 @@ deleteRBO (RBO n) = withArray [n] (\ptr -> glDeleteRenderbuffers 1 ptr)
 --   outColor c = texture(tex, floor(Texcoord*d)/d);
 -- }
 -- @
---
--- And the output looks like
---
--- <<framebuffer.gif Animated screenshot showing post-processing effect>>
-

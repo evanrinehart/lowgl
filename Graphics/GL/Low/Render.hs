@@ -1,7 +1,11 @@
 module Graphics.GL.Low.Render (
-  Culling(..),
-  Viewport(..),
-  IndexFormat(..),
+
+  -- * Primitives
+  --
+  -- | Render various kinds of primitives to the current framebuffer using
+  -- the current shader program. The integer argument is the number of
+  -- vertices to read from the VBOs via the current VAO.
+  --
   drawPoints,
   drawLines,
   drawLineStrip,
@@ -9,6 +13,13 @@ module Graphics.GL.Low.Render (
   drawTriangles,
   drawTriangleStrip,
   drawTriangleFan,
+
+  -- * Primitives (by index)
+  --
+  -- | Render various kinds of primitives by traversing the vertices in the
+  -- order specified in the current ElementArray. The format argument indicates
+  -- the size of each index in the ElementArray.
+  --
   drawIndexedPoints,
   drawIndexedLines,
   drawIndexedLineStrip,
@@ -16,11 +27,21 @@ module Graphics.GL.Low.Render (
   drawIndexedTriangles,
   drawIndexedTriangleStrip,
   drawIndexedTriangleFan,
+
+  -- * Scissor Test
   enableScissorTest,
   disableScissorTest,
+
+  -- * Facet Culling
   enableCulling,
   disableCulling,
-  setViewport
+
+  -- * Viewport
+  setViewport,
+
+  Culling(..),
+  Viewport(..),
+  IndexFormat(..)
 ) where
 
 import Foreign.Ptr

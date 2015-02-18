@@ -1,8 +1,7 @@
+module Graphics.GL.Low.VertexAttrib (
 -- | To feed vertices into the vertex shader, the layout of a vertex must be
 -- specified in the current VAO for the current shader program. Make a list of
 -- LayoutElements and use 'setVertexLayout' on it as seen below.
---
--- == Example
 --
 -- @
 -- setVertexLayout
@@ -17,8 +16,6 @@
 -- In this example four mappings from the current VBO to the variables
 -- in the current Program will be established in the current VAO.
 
-
-module Graphics.GL.Low.VertexAttrib (
   setVertexLayout,
   VertexLayout(..),
   DataType(..)
