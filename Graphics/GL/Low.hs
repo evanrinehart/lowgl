@@ -20,7 +20,7 @@ module Graphics.GL.Low (
   -- `linear' package for matrices.
   --
   --
-  -- See specific modules for topic-specific docs and example code
+  -- See specific modules for topic-specific docs and example code:
   --
   -- @"Graphics.GL.Low.VAO"@
   --

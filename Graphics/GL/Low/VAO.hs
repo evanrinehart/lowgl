@@ -7,7 +7,7 @@ module Graphics.GL.Low.VAO (
 -- the integer location of the variable) with three things:
 --
 -- - The VBO to read from.
--- - The position in the each vertex array (in the VBO) to read from.
+-- - The position in the vertex array to read from.
 -- - The interpretation of the bytes found there (32-bit float, 16-bit int, etc).
 --
 -- You set these VAO parameters with the following dance:
