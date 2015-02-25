@@ -66,27 +66,10 @@ import Graphics.GL
 import Linear
 
 import Graphics.GL.Low.Internal.Types
+import Graphics.GL.Low.Internal.Shader
 import Graphics.GL.Low.Classes
 import Graphics.GL.Low.VertexAttrib
 
-
--- | Either a vertex shader or a fragment shader.
-data ShaderType = VertexShader | FragmentShader 
-  deriving (Eq, Ord, Show, Read)
-
-instance ToGL ShaderType where
-  toGL VertexShader = GL_VERTEX_SHADER
-  toGL FragmentShader = GL_FRAGMENT_SHADER
-
--- | The error message emitted by the driver when shader compilation or
--- linkage fails.
-data ProgramError =
-  VertexShaderError String |
-  FragmentShaderError String |
-  LinkError String
-    deriving (Show, Typeable)
-  
-instance Exception ProgramError
 
 -- | Same as 'newProgram' but does not throw exceptions.
 newProgramSafe :: (MonadIO m) => String -> String -> m (Either ProgramError Program)
@@ -104,48 +87,34 @@ newProgram :: (MonadIO m)
            -> String -- ^ fragment shader source code
            -> m Program
 newProgram vcode fcode = liftIO $ do
-  vertexShaderId <- compileShader vcode VertexShader
-  fragmentShaderId <- compileShader fcode FragmentShader
-  programId <- glCreateProgram
-  glAttachShader programId vertexShaderId
-  glAttachShader programId fragmentShaderId
-  glLinkProgram programId
-  result <- alloca $ \ptr ->
-    glGetProgramiv programId GL_LINK_STATUS ptr >> peek ptr
-  when (result == GL_FALSE) $ do
-    len <- fmap fromIntegral $ alloca $ \ptr ->
-      glGetProgramiv programId GL_INFO_LOG_LENGTH ptr >> peek ptr
-    errors <- allocaArray len $ \ptr -> do
-      glGetProgramInfoLog programId (fromIntegral len) nullPtr ptr
-      peekCString ptr
+  vertexShader <- compileShader vcode VertexShader
+  fragmentShader <- compileShader fcode FragmentShader
+  program <- createProgram
+  attachShader program vertexShader
+  attachShader program fragmentShader
+  linkProgram program
+  linked <- linkStatus program
+  when (not linked) $ do
+    errors <- infoLog program
     throwIO (LinkError errors)
-  glDeleteShader vertexShaderId
-  glDeleteShader fragmentShaderId
-  return (Program programId)
+  deleteShader vertexShader
+  deleteShader fragmentShader
+  return program
+
+
+infoLog :: (MonadIO m) => Program -> m String
+infoLog p = do
+    len <- infoLogLength p
+    liftIO . allocaArray len $ 
+        \ptr -> do
+            glGetProgramInfoLog (fromProgram p) (fromIntegral len) nullPtr ptr
+            peekCString ptr
+
 
 -- | Install a program into the rendering pipeline. Replaces the program
 -- already in use, if any.
 useProgram :: (MonadIO m) => Program -> m ()
 useProgram (Program n) = glUseProgram n
-
-compileShader :: (MonadIO m) => String -> ShaderType -> m GLuint
-compileShader code vertOrFrag = liftIO $ do
-  shaderId <- glCreateShader (toGL vertOrFrag)
-  withCString code $ \ptr -> with ptr $ \pptr -> do
-    glShaderSource shaderId 1 pptr nullPtr
-    glCompileShader shaderId
-  result <- with GL_FALSE $ \ptr ->
-    glGetShaderiv shaderId GL_COMPILE_STATUS ptr >> peek ptr
-  when (result == GL_FALSE) $ do
-    len <- fmap fromIntegral $ alloca $ \ptr ->
-      glGetShaderiv shaderId GL_INFO_LOG_LENGTH ptr >> peek ptr
-    errors <- allocaArray len $ \ptr -> do
-      glGetShaderInfoLog shaderId (fromIntegral len) nullPtr ptr
-      peekCString ptr
-    case vertOrFrag of
-      VertexShader -> throwIO (VertexShaderError errors)
-      FragmentShader -> throwIO (FragmentShaderError errors)
-  return shaderId
 
 setUniform1f :: (MonadIO m) => String -> [Float] -> m ()
 setUniform1f = setUniform glUniform1fv
@@ -189,21 +158,6 @@ setUniform33 = setUniform
 setUniform22 :: (MonadIO m) => String -> [M22 Float] -> m ()
 setUniform22 = setUniform
   (\loc cnt val -> glUniformMatrix2fv loc cnt GL_FALSE (castPtr val))
-
-setUniform :: (MonadIO m, Storable a)
-           => (GLint -> GLsizei -> Ptr a -> IO ())
-           -> String
-           -> [a]
-           -> m ()
-setUniform glAction name xs = liftIO . withArrayLen xs $ \n bytes -> do
-  p <- alloca (\ptr -> glGetIntegerv GL_CURRENT_PROGRAM ptr >> peek ptr)
-  if p == 0
-    then return ()
-    else do
-      loc <- withCString name (\ptr -> glGetUniformLocation (fromIntegral p) ptr)
-      if loc == -1
-        then return ()
-        else glAction loc (fromIntegral n) bytes
 
 
 -- $example

@@ -1,8 +1,8 @@
-module Graphics.GL.Low.Common where
+module Graphics.GL.Low.Internal.Common where
 
 import Graphics.GL
 
-import Graphics.GL.Low.Cube
+import Graphics.GL.Low.Internal.Types
 
 cubeSideCodes :: Cube GLenum
 cubeSideCodes = Cube

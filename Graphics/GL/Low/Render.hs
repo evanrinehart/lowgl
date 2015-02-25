@@ -51,19 +51,8 @@ import Control.Monad.IO.Class
 
 import Graphics.GL
 
+import Graphics.GL.Low.Internal.Types
 import Graphics.GL.Low.Classes
-
--- | Facet culling modes.
-data Culling =
-  CullFront |
-  CullBack |
-  CullFrontAndBack
-    deriving Show
-
-instance ToGL Culling where
-  toGL CullFront = GL_FRONT
-  toGL CullBack = GL_BACK
-  toGL CullFrontAndBack = GL_FRONT_AND_BACK
 
 -- | A rectangular section of the window.
 data Viewport = Viewport
@@ -72,19 +61,6 @@ data Viewport = Viewport
   , viewportW :: Int
   , viewportH :: Int }
     deriving (Eq, Show)
-
--- | How indices are packed in an ElementArray buffer object.
-data IndexFormat =
-  UByteIndices  | -- ^ Each index is one unsigned byte.
-  UShortIndices | -- ^ Each index is a two byte unsigned int.
-  UIntIndices     -- ^ Each index is a four byte unsigned int.
-    deriving Show
-
-instance ToGL IndexFormat where
-  toGL UByteIndices  = GL_UNSIGNED_BYTE
-  toGL UShortIndices = GL_UNSIGNED_SHORT
-  toGL UIntIndices   = GL_UNSIGNED_INT
-
 
 
 drawPoints :: (MonadIO m) => Int -> m ()

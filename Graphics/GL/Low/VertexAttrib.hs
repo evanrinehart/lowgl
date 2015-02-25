@@ -30,6 +30,7 @@ import Control.Monad (forM_)
 import Control.Monad.IO.Class
 
 import Graphics.GL
+import Graphics.GL.Low.Internal.Types
 import Graphics.GL.Low.Classes
 
 -- | The name of a vertex input to a program combined with the
@@ -40,17 +41,6 @@ data VertexLayout =
   Attrib String Int DataType | -- ^ Name, component count and component format of a vertex attribute.
   Unused Int -- ^ Size in bytes of an unused section of the vertex data.
     deriving Show
-
--- | The size and interpretation of a vertex attribute component.
-data DataType =
-  GLFloat         | -- ^ 4-byte float
-  GLByte          | -- ^ signed byte
-  GLUnsignedByte  | -- ^ unsigned byte
-  GLShort         | -- ^ 2-byte signed integer
-  GLUnsignedShort | -- ^ 2-byte unsigned integer
-  GLInt           | -- ^ 4-byte signed integer
-  GLUnsignedInt     -- ^ 4-byte unsigned integer
-    deriving (Eq, Show)
 
 -- | This configures the currently bound VAO. It calls glVertexAttribPointer
 -- and glEnableVertexAttribArray.
@@ -73,16 +63,6 @@ setVertexLayout layout = liftIO $ do
           (fromIntegral stride)
           (castPtr (nullPtr `plusPtr` offset))
         glEnableVertexAttribArray (fromIntegral attrib)
-
-
-instance ToGL DataType where
-  toGL GLFloat         = GL_FLOAT
-  toGL GLByte          = GL_BYTE
-  toGL GLUnsignedByte  = GL_UNSIGNED_BYTE
-  toGL GLShort         = GL_SHORT
-  toGL GLUnsignedShort = GL_UNSIGNED_SHORT
-  toGL GLInt           = GL_INT
-  toGL GLUnsignedInt   = GL_UNSIGNED_INT
 
 elaborateLayout :: Int -> [VertexLayout] -> [(String, Int, Int, DataType)]
 elaborateLayout here layout = case layout of
