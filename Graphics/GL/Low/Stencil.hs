@@ -40,7 +40,7 @@ import Graphics.GL.Low.Classes
 enableStencil :: (MonadIO m) => Stencil -> m ()
 enableStencil (Stencil f r m op1 op2 op3) = do
   glStencilFunc (toGL f) (fromIntegral r) (fromIntegral m)
-  glStencilOp (toGL op1) (toGL op2) (toGL op2)
+  glStencilOp (toGL op1) (toGL op2) (toGL op3)
   glEnable GL_STENCIL_TEST
 
 -- | Disable the stencil test and updates to the stencil buffer, if one exists.
