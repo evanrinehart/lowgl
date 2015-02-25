@@ -1,0 +1,13 @@
+*~
+*.hi
+*.o
+*.prof_o
+*.prof_hi
+*.dyn_hi
+*.dyn_o
+*.js_hi
+*.js_o
+dist/
+*.jsexe/
+*.prof
+

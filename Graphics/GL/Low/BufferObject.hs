@@ -61,16 +61,13 @@ import Foreign.Storable
 import qualified Data.Vector.Storable as V
 import Data.Vector.Storable (Vector)
 import Data.Word
+import Control.Monad.IO.Class
 
 import Graphics.GL
 
+import Graphics.GL.Low.Internal.Types
 import Graphics.GL.Low.Classes
 
--- | Handle to a VBO.
-data VBO = VBO GLuint deriving Show
-
--- | Handle to an element array buffer object.
-data ElementArray = ElementArray GLuint deriving Show
 
 -- | Usage hint for allocation of buffer object storage.
 data UsageHint = StaticDraw  -- ^ Data will seldomly change.
@@ -83,72 +80,63 @@ instance ToGL UsageHint where
   toGL DynamicDraw = GL_DYNAMIC_DRAW
   toGL StreamDraw  = GL_STREAM_DRAW
 
-instance GLObject VBO where
-  glObjectName (VBO n) = fromIntegral n
-
-instance GLObject ElementArray where
-  glObjectName (ElementArray n) = fromIntegral n
-
-instance BufferObject VBO
-
-instance BufferObject ElementArray
 
 
 -- | Create a buffer object from a blob of bytes. The usage argument hints
 -- at how often you will modify the data.
-newVBO :: Storable a => Vector a -> UsageHint -> IO VBO
+newVBO :: (MonadIO m, Storable a) => Vector a -> UsageHint -> m VBO
 newVBO = newBufferObject VBO GL_ARRAY_BUFFER
 
 -- | Delete a VBO or ElementArray.
-deleteBufferObject :: BufferObject a => a -> IO ()
-deleteBufferObject bo = withArray [glObjectName bo] (\ptr -> glDeleteBuffers 1 ptr)
+deleteBufferObject :: (MonadIO m, BufferObject a) => a -> m ()
+deleteBufferObject bo = liftIO $ withArray [glObjectName bo] (\ptr -> glDeleteBuffers 1 ptr)
 
 -- | Modify the data in the currently bound VBO starting from the specified
 -- index in bytes.
-updateVBO :: Storable a => Vector a -> Int -> IO ()
+updateVBO :: (MonadIO m, Storable a) => Vector a -> Int -> m ()
 updateVBO = updateBufferObject GL_ARRAY_BUFFER
 
 -- | Bind a VBO to the array buffer binding target. The buffer object bound
 -- there will be replaced, if any.
-bindVBO :: VBO -> IO ()
+bindVBO :: (MonadIO m) => VBO -> m ()
 bindVBO (VBO n) = glBindBuffer GL_ARRAY_BUFFER n
 
 
 -- | Create a new ElementArray buffer object from the blob of packed indices.
 -- The usage argument hints at how often you plan to modify the data.
-newElementArray :: Storable a => Vector a -> UsageHint -> IO ElementArray
+newElementArray :: (MonadIO m, Storable a) => Vector a -> UsageHint -> m ElementArray
 newElementArray = newBufferObject ElementArray GL_ELEMENT_ARRAY_BUFFER
 
 -- | Modify contents in the currently bound ElementArray starting at the
 -- specified index in bytes.
-updateElementArray :: Storable a => Vector a -> Int -> IO ()
+updateElementArray :: (MonadIO m, Storable a) => Vector a -> Int -> m ()
 updateElementArray = updateBufferObject GL_ELEMENT_ARRAY_BUFFER
 
 -- | Assign an ElementArray to the element array binding target. It will
 -- replace the ElementArray already bound there, if any. Note that the state
 -- of the element array binding target is a function of the current VAO.
-bindElementArray :: ElementArray -> IO ()
+bindElementArray :: (MonadIO m) => ElementArray -> m ()
 bindElementArray (ElementArray n) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
 
 
-newBufferObject :: forall a b . Storable a => (GLuint -> b) -> GLenum -> Vector a -> UsageHint -> IO b
+newBufferObject :: forall m a b. (MonadIO m, Storable a) => (GLuint -> b) -> GLenum -> Vector a -> UsageHint -> m b
 newBufferObject ctor target src usage = do
-  n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
+  n <- liftIO $ alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
   glBindBuffer target n
   let (fptr, off, len) = V.unsafeToForeignPtr src
   let size = sizeOf (undefined :: a)
-  withForeignPtr fptr $ \ptr -> glBufferData
+  liftIO . withForeignPtr fptr $ \ptr -> glBufferData
     target
     (fromIntegral (len * size))
     (castPtr (ptr `plusPtr` off))
     (toGL usage)
   return (ctor n)
 
-updateBufferObject :: forall a . Storable a => GLenum -> Vector a -> Int -> IO ()
+updateBufferObject :: forall m a. (MonadIO m, Storable a) => GLenum -> Vector a -> Int -> m ()
 updateBufferObject target bytes offset = do
   let (fptr, off, len) = V.unsafeToForeignPtr bytes
   let size = sizeOf (undefined :: a)
-  withForeignPtr fptr $ \ptr -> glBufferSubData
+  liftIO . withForeignPtr fptr $ \ptr -> glBufferSubData
     target
     (fromIntegral offset)
     (fromIntegral (len * size))

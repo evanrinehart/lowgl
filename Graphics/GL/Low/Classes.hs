@@ -25,6 +25,12 @@ class GLObject a => BufferObject a where
 class ToGL a where
   toGL :: (Num b, Eq b) => a -> b
 
+instance ToGL Bool where
+  toGL True = GL_TRUE
+  toGL False = GL_FALSE
+
+
+
 -- | All GL objects have some numeric name.
 class GLObject a where
   glObjectName :: Num b => a -> b

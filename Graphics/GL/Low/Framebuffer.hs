@@ -46,24 +46,17 @@ module Graphics.GL.Low.Framebuffer (
 import Foreign.Ptr
 import Foreign.Marshal
 import Foreign.Storable
+import Control.Monad.IO.Class
 
 import Data.Default
 import Graphics.GL
 
+import Graphics.GL.Low.Internal.Types
 import Graphics.GL.Low.Classes
 import Graphics.GL.Low.Common
 import Graphics.GL.Low.Cube
 import Graphics.GL.Low.Texture
 
-
--- | A framebuffer object is an alternative rendering destination. Once an FBO
--- is bound to framebuffer binding target, it is possible to attach images
--- (textures or RBOs) for color, depth, or stencil rendering.
-newtype FBO = FBO GLuint deriving Show
-
--- | An RBO is a kind of image object used for rendering. The only thing
--- you can do with an RBO is attach it to an FBO.
-data RBO a = RBO { unRBO :: GLuint } deriving Show
 
 -- | The default framebuffer.
 data DefaultFramebuffer = DefaultFramebuffer deriving Show
@@ -74,34 +67,24 @@ instance Default DefaultFramebuffer where
 instance Framebuffer DefaultFramebuffer where
   framebufferName _ = 0
 
-instance Framebuffer FBO where
-  framebufferName = glObjectName
-
-instance GLObject FBO where
-  glObjectName (FBO n) = fromIntegral n
-
-instance GLObject (RBO a) where
-  glObjectName (RBO n) = fromIntegral n
 
 -- | Binds an FBO or the default framebuffer to the framebuffer binding target.
 -- Replaces the framebuffer already bound there.
-bindFramebuffer :: Framebuffer a => a -> IO ()
+bindFramebuffer :: (MonadIO m, Framebuffer a) => a -> m ()
 bindFramebuffer x = glBindFramebuffer GL_FRAMEBUFFER (framebufferName x)
 
 -- | Create a new framebuffer object. Before the framebuffer can be used for
 -- rendering it must have a color image attachment.
-newFBO :: IO FBO
-newFBO = do
-  n <- alloca (\ptr -> glGenFramebuffers 1 ptr >> peek ptr)
-  return (FBO n)
+newFBO :: (MonadIO m) => m FBO
+newFBO = liftIO . fmap FBO $ alloca (\ptr -> glGenFramebuffers 1 ptr >> peek ptr)
 
 -- | Delete an FBO.
-deleteFBO :: FBO -> IO ()
-deleteFBO (FBO n) = withArray [n] (\ptr -> glDeleteFramebuffers 1 ptr)
+deleteFBO :: (MonadIO m) => FBO -> m ()
+deleteFBO (FBO n) = liftIO $ withArray [n] (\ptr -> glDeleteFramebuffers 1 ptr)
 
 -- | Attach a 2D texture to the FBO currently bound to the
 -- framebuffer binding target.
-attachTex2D :: Attachable a => Tex2D a -> IO ()
+attachTex2D :: (MonadIO m, Attachable a) => Tex2D a -> m ()
 attachTex2D tex =
   glFramebufferTexture2D
     GL_FRAMEBUFFER
@@ -112,7 +95,7 @@ attachTex2D tex =
 
 -- | Attach one of the sides of a cubemap texture to the FBO currently bound
 -- to the framebuffer binding target.
-attachCubeMap :: Attachable a => CubeMap a -> Side -> IO ()
+attachCubeMap :: (MonadIO m, Attachable a) => CubeMap a -> Side -> m ()
 attachCubeMap cm side =
   glFramebufferTexture2D
     GL_FRAMEBUFFER
@@ -123,14 +106,14 @@ attachCubeMap cm side =
 
 -- | Attach an RBO to the FBO currently bound to the framebuffer binding
 -- target.
-attachRBO :: Attachable a => RBO a -> IO ()
+attachRBO :: (MonadIO m, Attachable a) => RBO a -> m ()
 attachRBO rbo = glFramebufferRenderbuffer
   GL_FRAMEBUFFER (attachPoint rbo) GL_RENDERBUFFER (unRBO rbo)
 
 -- | Create a new renderbuffer with the specified dimensions.
-newRBO :: InternalFormat a => Int -> Int -> IO (RBO a)
+newRBO :: (MonadIO m, InternalFormat a) => Int -> Int -> m (RBO a)
 newRBO w h = do
-  n <- alloca (\ptr -> glGenRenderbuffers 1 ptr >> peek ptr)
+  n <- liftIO $ alloca (\ptr -> glGenRenderbuffers 1 ptr >> peek ptr)
   rbo <- return (RBO n)
   glBindRenderbuffer GL_RENDERBUFFER n
   glRenderbufferStorage
@@ -141,8 +124,8 @@ newRBO w h = do
   return rbo
 
 -- | Delete an RBO.
-deleteRBO :: RBO a -> IO ()
-deleteRBO (RBO n) = withArray [n] (\ptr -> glDeleteRenderbuffers 1 ptr)
+deleteRBO :: (MonadIO m) => RBO a -> m ()
+deleteRBO (RBO n) = liftIO $ withArray [n] (\ptr -> glDeleteRenderbuffers 1 ptr)
 
 
 -- $example

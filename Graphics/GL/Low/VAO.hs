@@ -63,29 +63,25 @@ module Graphics.GL.Low.VAO (
 
 import Foreign.Storable
 import Foreign.Marshal
+import Control.Monad.IO.Class
 
 import Graphics.GL
 
+import Graphics.GL.Low.Internal.Types
 import Graphics.GL.Low.Classes
-
--- | Handle to a VAO.
-newtype VAO = VAO GLuint deriving Show
-
-instance GLObject VAO where
-  glObjectName (VAO n) = fromIntegral n
 
 -- | Create a new VAO. The only thing you can do with a VAO is bind it to
 -- the vertex array binding target.
-newVAO :: IO VAO
-newVAO = do
+newVAO :: (MonadIO m) => m VAO
+newVAO = liftIO $ do
   n <- alloca (\ptr -> glGenVertexArrays 1 ptr >> peek ptr)
   return (VAO n)
 
 -- | Delete a VAO.
-deleteVAO :: VAO -> IO ()
-deleteVAO (VAO n) = withArray [n] (\ptr -> glDeleteVertexArrays 1 ptr)
+deleteVAO :: (MonadIO m) => VAO -> m ()
+deleteVAO (VAO n) = liftIO $ withArray [n] (\ptr -> glDeleteVertexArrays 1 ptr)
 
 -- | Assign the VAO to the vertex array binding target. The VAO already bound
 -- will be replaced, if any.
-bindVAO :: VAO -> IO ()
+bindVAO :: (MonadIO m) => VAO -> m ()
 bindVAO (VAO n) = glBindVertexArray n
