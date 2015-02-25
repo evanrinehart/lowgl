@@ -27,6 +27,7 @@ import Foreign.Ptr
 import Foreign.Marshal
 import Foreign.Storable
 import Control.Monad (forM_)
+import Control.Monad.IO.Class
 
 import Graphics.GL
 import Graphics.GL.Low.Classes
@@ -53,8 +54,8 @@ data DataType =
 
 -- | This configures the currently bound VAO. It calls glVertexAttribPointer
 -- and glEnableVertexAttribArray.
-setVertexLayout :: [VertexLayout] -> IO ()
-setVertexLayout layout = do
+setVertexLayout :: (MonadIO m) => [VertexLayout] -> m ()
+setVertexLayout layout = liftIO $ do
   p <- alloca (\ptr -> glGetIntegerv GL_CURRENT_PROGRAM ptr >> peek ptr)
   if p == 0
     then return ()
@@ -82,10 +83,6 @@ instance ToGL DataType where
   toGL GLUnsignedShort = GL_UNSIGNED_SHORT
   toGL GLInt           = GL_INT
   toGL GLUnsignedInt   = GL_UNSIGNED_INT
-
-instance ToGL Bool where
-  toGL True = GL_TRUE
-  toGL False = GL_FALSE
 
 elaborateLayout :: Int -> [VertexLayout] -> [(String, Int, Int, DataType)]
 elaborateLayout here layout = case layout of

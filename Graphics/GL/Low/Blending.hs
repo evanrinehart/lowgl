@@ -24,13 +24,14 @@ module Graphics.GL.Low.Blending (
   -- $example
 ) where
 
+import Control.Monad.IO.Class
 import Data.Default
 import Graphics.GL
 
 import Graphics.GL.Low.Classes
 
 -- | Enable blending with the specified blending parameters.
-enableBlending :: Blending -> IO ()
+enableBlending :: (MonadIO m) => Blending -> m ()
 enableBlending (Blending s d f (r,g,b,a)) = do
   glBlendFunc (toGL s) (toGL d)
   glBlendEquation (toGL f)
@@ -39,7 +40,7 @@ enableBlending (Blending s d f (r,g,b,a)) = do
   glEnable GL_BLEND
 
 -- | Disable alpha blending.
-disableBlending :: IO ()
+disableBlending :: (MonadIO m) => m ()
 disableBlending = glDisable GL_BLEND
 
 -- | This blending configuration is suitable for ordinary alpha blending
@@ -78,7 +79,7 @@ data BlendEquation =
   FuncAdd | -- ^ the default
   FuncSubtract |
   FuncReverseSubtract
-    deriving Show
+    deriving (Eq, Ord, Show, Read)
 
 instance Default BlendEquation where
   def = FuncAdd

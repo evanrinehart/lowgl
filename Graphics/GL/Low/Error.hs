@@ -16,6 +16,7 @@ module Graphics.GL.Low.Error (
 
 import Control.Exception
 import Data.Typeable
+import Control.Monad.IO.Class
 
 import Graphics.GL
 
@@ -47,7 +48,7 @@ instance Show GLError where
 -- adversely affect performance (not to mention be very tedious). Since there
 -- is no reasonable way to recover from a GL error, a good idea might be to
 -- check this once per frame or even less often, and respond with a core dump.
-getGLError :: IO (Maybe GLError)
+getGLError :: (MonadIO m) => m (Maybe GLError)
 getGLError = do
   n <- glGetError
   return $ case n of
@@ -60,9 +61,9 @@ getGLError = do
     _ -> error ("unknown GL error " ++ show n)
 
 -- | Throws an exception if 'getGLError' returns non-Nothing.
-assertNoGLError :: IO ()
+assertNoGLError :: (MonadIO m) => m ()
 assertNoGLError = do
   me <- getGLError
   case me of
     Nothing -> return ()
-    Just e  -> throwIO e
+    Just e  -> liftIO $ throwIO e
