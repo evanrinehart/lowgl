@@ -65,7 +65,8 @@ library
                        Graphics.GL.Low.Texture
                        Graphics.GL.Low.VAO
                        Graphics.GL.Low.VertexAttrib
-  other-modules:       Graphics.GL.Low.Common
+                       Graphics.GL.Low.Common
+                       Graphics.GL.Low.Internal.Types
   
   -- Modules included in this library but not exported.
   -- other-modules:       
