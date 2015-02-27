@@ -19,8 +19,6 @@ class GLObject a => Texture a where
 class Framebuffer a where
   framebufferName :: Num b => a -> b
 
-class GLObject a => BufferObject a where
-
 -- | Mappable to GL enums.
 class ToGL a where
   toGL :: (Num b, Eq b) => a -> b

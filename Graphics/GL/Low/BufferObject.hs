@@ -51,6 +51,7 @@ module Graphics.GL.Low.BufferObject (
   deleteBufferObject,
   VBO,
   ElementArray,
+  BufferObject(..),
   UsageHint(..)
 ) where
 
@@ -82,10 +83,13 @@ instance ToGL UsageHint where
 
 
 
+newBufferObject :: (MonadIO m, Storable a) => Vector a -> UsageHint -> m VBO
+newBufferObject = newBufferObjectInner
+
 -- | Create a buffer object from a blob of bytes. The usage argument hints
 -- at how often you will modify the data.
 newVBO :: (MonadIO m, Storable a) => Vector a -> UsageHint -> m VBO
-newVBO = newBufferObject VBO GL_ARRAY_BUFFER
+newVBO = newBufferObjectInner
 
 -- | Delete a VBO or ElementArray.
 deleteBufferObject :: (MonadIO m, BufferObject a) => a -> m ()
@@ -105,7 +109,7 @@ bindVBO (VBO n) = glBindBuffer GL_ARRAY_BUFFER n
 -- | Create a new ElementArray buffer object from the blob of packed indices.
 -- The usage argument hints at how often you plan to modify the data.
 newElementArray :: (MonadIO m, Storable a) => Vector a -> UsageHint -> m ElementArray
-newElementArray = newBufferObject ElementArray GL_ELEMENT_ARRAY_BUFFER
+newElementArray = newBufferObjectInner
 
 -- | Modify contents in the currently bound ElementArray starting at the
 -- specified index in bytes.
@@ -116,13 +120,16 @@ updateElementArray = updateBufferObject GL_ELEMENT_ARRAY_BUFFER
 -- replace the ElementArray already bound there, if any. Note that the state
 -- of the element array binding target is a function of the current VAO.
 bindElementArray :: (MonadIO m) => ElementArray -> m ()
-bindElementArray (ElementArray n) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
+bindElementArray (BufferObject n) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
 
 
-newBufferObject :: forall m a b. (MonadIO m, Storable a) => (GLuint -> b) -> GLenum -> Vector a -> UsageHint -> m b
-newBufferObject ctor target src usage = do
+newBufferObjectInner :: forall m a . (MonadIO m, Storable a)
+                     -> Vector a
+                     -> UsageHint
+                     -> m BufferObject
+newBufferObjectInner src usage = do
   n <- liftIO $ alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
-  glBindBuffer target n
+  glBindBuffer GL_ARRAY_BUFFER n
   let (fptr, off, len) = V.unsafeToForeignPtr src
   let size = sizeOf (undefined :: a)
   liftIO . withForeignPtr fptr $ \ptr -> glBufferData
@@ -130,9 +137,13 @@ newBufferObject ctor target src usage = do
     (fromIntegral (len * size))
     (castPtr (ptr `plusPtr` off))
     (toGL usage)
-  return (ctor n)
+  return (BufferObject n)
 
-updateBufferObject :: forall m a. (MonadIO m, Storable a) => GLenum -> Vector a -> Int -> m ()
+updateBufferObject :: forall m a. (MonadIO m, Storable a)
+                   => GLenum
+                   -> Vector a
+                   -> Int
+                   -> m ()
 updateBufferObject target bytes offset = do
   let (fptr, off, len) = V.unsafeToForeignPtr bytes
   let size = sizeOf (undefined :: a)

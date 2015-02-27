@@ -29,24 +29,19 @@ newtype Shader = Shader { fromShader :: GLuint }
     deriving (Eq, Ord, Read, Show, Storable, Data, Typeable)
 
 
--- | Handle to a VBO.
-newtype VBO = VBO { fromVBO :: GLuint } 
+-- | Handle to a buffer object.
+newtype BufferObject = BufferObject { fromBufferObject :: GLuint } deriving Show
     deriving (Eq, Ord, Read, Show, Storable, Data, Typeable)
 
-instance GLObject VBO where
-  glObjectName (VBO n) = fromIntegral n
+instance GLObject BufferObject where
+  glObjectName (BufferObject n) = fromIntegral n
 
-instance BufferObject VBO
-
+-- | Handle to a VBO.
+type VBO = BufferObject
 
 -- | Handle to an element array buffer object.
-newtype ElementArray = ElementArray { fromElementArray :: GLuint }
-    deriving (Eq, Ord, Read, Show, Storable, Data, Typeable)
+type ElementArray = BufferObject
 
-instance GLObject ElementArray where
-  glObjectName (ElementArray n) = fromIntegral n
-
-instance BufferObject ElementArray
 
 
 
