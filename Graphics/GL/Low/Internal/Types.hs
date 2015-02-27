@@ -15,6 +15,7 @@ import Data.Foldable
 import Data.Traversable
 import Data.Data (Data, Typeable)
 import Foreign.Storable (Storable)
+import Data.Text (Text)
 
 import Graphics.GL
 
@@ -23,6 +24,12 @@ import Graphics.GL.Low.Classes
 
 
 newtype TextureUnit = TextureUnit { fromTextureUnit :: GLuint } 
+    deriving (Eq, Ord, Read, Show, Num, Integral, Real, Enum, Storable)
+
+newtype AttribIndex = AttribIndex { fromAttribIndex :: GLuint } 
+    deriving (Eq, Ord, Read, Show, Num, Integral, Real, Enum, Storable)
+
+newtype UniformIndex = UniformIndex { fromUniformIndex :: GLuint } 
     deriving (Eq, Ord, Read, Show, Num, Integral, Real, Enum, Storable)
 
 newtype AttribLocation = AttribLocation { fromAttribLocation :: GLuint } 
@@ -40,6 +47,16 @@ newtype Program = Program { fromProgram :: GLuint }
 newtype Shader = Shader { fromShader :: GLuint } 
     deriving (Eq, Ord, Read, Show, Storable, Data, Typeable)
 
+
+data ShaderVar l t = ShaderVar
+    { varName     :: Text
+    , varLocation :: l
+    , varType     :: t
+    , varSize     :: Int
+    } deriving (Eq, Ord, Show, Data, Typeable)
+
+type ShaderAttrib = ShaderVar AttribLocation GLAttribType
+type ShaderUniform = ShaderVar UniformLocation GLUniformType
 
 -- | Handle to a VBO.
 newtype VBO = VBO { fromVBO :: GLuint } 
@@ -141,13 +158,19 @@ instance Monoid a => Monoid (Cube a) where
     (x6 <> y6)
 
 
+data ShaderError = ShaderTypeError String
+                 | ProgramError ProgramError
+    deriving (Eq, Ord, Show, Data, Typeable)
+  
+instance Exception ShaderError
+
 -- | The error message emitted by the driver when shader compilation or
 -- linkage fails.
 data ProgramError =
   VertexShaderError String |
   FragmentShaderError String |
   LinkError String
-    deriving (Show, Typeable)
+    deriving (Eq, Ord, Show, Data, Typeable)
   
 instance Exception ProgramError
 

@@ -31,10 +31,14 @@ module Graphics.GL.Low.Shader (
 -- - a color (this is more complicated in reality but close enough)
 -- - the depth of the pixel, gl_FragDepth, which will default to the pixel's Z.
 --
-  newProgram,
-  newProgramSafe,
-  useProgram,
-  deleteProgram,
+  newProgram, newProgramSafe, makeProgram, deleteProgram,
+  
+  newShader,
+  
+  activeAttribs, activeUniforms,
+  
+  useProgram, 
+  
   setUniform1f,
   setUniform2f,
   setUniform3f,
@@ -62,11 +66,15 @@ import Control.Monad (when, forM_)
 import Data.Typeable
 import Control.Monad.IO.Class
 
+import Data.Text (Text)
+import qualified Data.Text as T
+
 import Graphics.GL
 import Linear
 
 import Graphics.GL.Low.Internal.Types
 import Graphics.GL.Low.Internal.Shader
+import Graphics.GL.Low.Internal.Common
 import Graphics.GL.Low.Classes
 import Graphics.GL.Low.VertexAttrib
 
@@ -75,10 +83,6 @@ import Graphics.GL.Low.VertexAttrib
 newProgramSafe :: (MonadIO m) => String -> String -> m (Either ProgramError Program)
 newProgramSafe vcode fcode = liftIO . try $ newProgram vcode fcode
 
--- | Delete a program.
-deleteProgram :: (MonadIO m) => Program -> m ()
-deleteProgram (Program n) = glDeleteProgram n
-
 -- | Compile the code for a vertex shader and a fragment shader, then link
 -- them into a new program. If the compiler or linker fails it will throw
 -- a ProgramError.
@@ -86,28 +90,62 @@ newProgram :: (MonadIO m)
            => String -- ^ vertex shader source code
            -> String -- ^ fragment shader source code
            -> m Program
-newProgram vcode fcode = liftIO $ do
-  vertexShader <- compileShader vcode VertexShader
-  fragmentShader <- compileShader fcode FragmentShader
-  program <- createProgram
-  attachShader program vertexShader
-  attachShader program fragmentShader
-  linkProgram program
-  linked <- linkStatus program
-  when (not linked) $ do
-    errors <- infoLog program
-    throwIO (LinkError errors)
-  deleteShader vertexShader
-  deleteShader fragmentShader
-  return program
+newProgram vcode fcode = do
+  vertexShader <- newShader vcode VertexShader
+  fragmentShader <- newShader fcode FragmentShader
+  makeProgram [vertexShader, fragmentShader]
+
+makeProgram :: (MonadIO m) => [Shader] -> m Program
+makeProgram shaders = do
+    program <- createProgram
+    mapM_ (attachShader program) shaders
+    linkProgram program
+    linked <- linkStatus program
+    when (not linked) $ do
+        errors <- programInfoLog program
+        throwM $ LinkError errors
+    mapM_ deleteShader shaders
+    return program
+
+newShader :: (MonadIO m) => String -> ShaderType -> m Shader
+newShader code vertOrFrag = do
+  shader <- createShader vertOrFrag
+  shaderSource shader (T.pack code)
+  compileShader shader
+  compiled <- compileStatus shader
+  when (not compiled) $ do
+    errors <- shaderInfoLog shader
+    case vertOrFrag of
+      VertexShader -> throwM $ VertexShaderError errors
+      FragmentShader -> throwM $ FragmentShaderError errors
+  return shader
 
 
-infoLog :: (MonadIO m) => Program -> m String
-infoLog p = do
-    len <- infoLogLength p
+activeAttribs :: (MonadIO m) => Program -> m [ShaderAttrib]
+activeAttribs p = do
+    aMax <- activeAttributeCount p
+    mapM (getShaderAttrib p) [0..aMax - 1]
+
+activeUniforms :: (MonadIO m) => Program -> m [ShaderUniform]
+activeUniforms p = do
+    uMax <- activeUniformCount p
+    mapM (getShaderUniform p) [0..uMax - 1]
+    
+
+programInfoLog :: (MonadIO m) => Program -> m String
+programInfoLog p = do
+    len <- programInfoLogLength p
     liftIO . allocaArray len $ 
         \ptr -> do
             glGetProgramInfoLog (fromProgram p) (fromIntegral len) nullPtr ptr
+            peekCString ptr
+
+shaderInfoLog :: (MonadIO m) => Shader -> m String
+shaderInfoLog s = do
+    len <- shaderInfoLogLength s
+    liftIO . allocaArray len $ 
+        \ptr -> do
+            glGetShaderInfoLog (fromShader s) (fromIntegral len) nullPtr ptr
             peekCString ptr
 
 
@@ -116,46 +154,46 @@ infoLog p = do
 useProgram :: (MonadIO m) => Program -> m ()
 useProgram (Program n) = glUseProgram n
 
-setUniform1f :: (MonadIO m) => String -> [Float] -> m ()
+setUniform1f :: (MonadIO m) => Text -> [Float] -> m ()
 setUniform1f = setUniform glUniform1fv
 
-setUniform2f :: (MonadIO m) => String -> [V2 Float] -> m ()
+setUniform2f :: (MonadIO m) => Text -> [V2 Float] -> m ()
 setUniform2f = setUniform
   (\loc cnt val -> glUniform2fv loc cnt (castPtr val))
 
-setUniform3f :: (MonadIO m) => String -> [V3 Float] -> m ()
+setUniform3f :: (MonadIO m) => Text -> [V3 Float] -> m ()
 setUniform3f = setUniform
   (\loc cnt val -> glUniform3fv loc cnt (castPtr val))
 
-setUniform4f :: (MonadIO m) => String -> [V4 Float] -> m ()
+setUniform4f :: (MonadIO m) => Text -> [V4 Float] -> m ()
 setUniform4f = setUniform
   (\loc cnt val -> glUniform4fv loc cnt (castPtr val))
 
-setUniform1i :: (MonadIO m) => String -> [Int] -> m ()
+setUniform1i :: (MonadIO m) => Text -> [Int] -> m ()
 setUniform1i = setUniform
   (\loc cnt val -> glUniform1iv loc cnt (castPtr val))
 
-setUniform2i :: (MonadIO m) => String -> [V2 Int] -> m ()
+setUniform2i :: (MonadIO m) => Text -> [V2 Int] -> m ()
 setUniform2i = setUniform 
   (\loc cnt val -> glUniform2iv loc cnt (castPtr val))
 
-setUniform3i :: (MonadIO m) => String -> [V3 Int] -> m ()
+setUniform3i :: (MonadIO m) => Text -> [V3 Int] -> m ()
 setUniform3i = setUniform
   (\loc cnt val -> glUniform3iv loc cnt (castPtr val))
 
-setUniform4i :: (MonadIO m) => String -> [V4 Int] -> m ()
+setUniform4i :: (MonadIO m) => Text -> [V4 Int] -> m ()
 setUniform4i = setUniform
   (\loc cnt val -> glUniform4iv loc cnt (castPtr val))
 
-setUniform44 :: (MonadIO m) => String -> [M44 Float] -> m ()
+setUniform44 :: (MonadIO m) => Text -> [M44 Float] -> m ()
 setUniform44 = setUniform
   (\loc cnt val -> glUniformMatrix4fv loc cnt GL_FALSE (castPtr val))
 
-setUniform33 :: (MonadIO m) => String -> [M33 Float] -> m ()
+setUniform33 :: (MonadIO m) => Text -> [M33 Float] -> m ()
 setUniform33 = setUniform
   (\loc cnt val -> glUniformMatrix3fv loc cnt GL_FALSE (castPtr val))
 
-setUniform22 :: (MonadIO m) => String -> [M22 Float] -> m ()
+setUniform22 :: (MonadIO m) => Text -> [M22 Float] -> m ()
 setUniform22 = setUniform
   (\loc cnt val -> glUniformMatrix2fv loc cnt GL_FALSE (castPtr val))
 
