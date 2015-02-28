@@ -50,8 +50,8 @@ import Control.Monad.IO.Class
 import Graphics.GL
 
 import Graphics.GL.Low.Internal.Types
+import Graphics.GL.Low.Internal.Common
 import Graphics.GL.Low.Classes
-import Graphics.GL.Low.Common
 import Graphics.GL.Low.Cube
 
 
@@ -187,28 +187,6 @@ setCubeMapWrapping wrap = do
   glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_S (toGL wrap)
   glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_T (toGL wrap)
   glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_R (toGL wrap)
-
--- | Texture filtering modes.
-data Filtering =
-  Nearest | -- ^ No interpolation.
-  Linear    -- ^ Linear interpolation.
-    deriving Show
-
-instance ToGL Filtering where
-  toGL Nearest = GL_NEAREST
-  toGL Linear = GL_LINEAR
-
--- | Texture wrapping modes.
-data Wrapping =
-  Repeat         | -- ^ Tile the texture past the boundary.
-  MirroredRepeat | -- ^ Tile the texture but mirror every other tile.
-  ClampToEdge      -- ^ Use the edge color for anything past the boundary.
-    deriving Show
-
-instance ToGL Wrapping where
-  toGL Repeat = GL_REPEAT
-  toGL MirroredRepeat = GL_MIRRORED_REPEAT
-  toGL ClampToEdge = GL_CLAMP_TO_EDGE
 
 -- | The size of an image in pixels.
 data Dimensions = Dimensions

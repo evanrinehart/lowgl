@@ -1,16 +1,35 @@
 {-# LANGUAGE DeriveDataTypeable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
-module Graphics.GL.Low.Internal.Types where
+module Graphics.GL.Low.Internal.Types (
+    module Graphics.GL.Low.Internal.Types,
+    module Graphics.GL.Low.Internal.GLEnum
+    ) where
 
+import Control.Applicative
+import Control.Exception
+import Data.Monoid
+import Data.Foldable
+import Data.Traversable
 import Data.Data (Data, Typeable)
 import Foreign.Storable (Storable)
+import Data.Text (Text)
 
-import Graphics.GL (GLuint)
+import Graphics.GL
 
+import Graphics.GL.Low.Internal.GLEnum
 import Graphics.GL.Low.Classes
 
 
 newtype TextureUnit = TextureUnit { fromTextureUnit :: GLuint } 
+    deriving (Eq, Ord, Read, Show, Num, Integral, Real, Enum, Storable)
+
+newtype AttribIndex = AttribIndex { fromAttribIndex :: GLuint } 
+    deriving (Eq, Ord, Read, Show, Num, Integral, Real, Enum, Storable)
+
+newtype UniformIndex = UniformIndex { fromUniformIndex :: GLuint } 
     deriving (Eq, Ord, Read, Show, Num, Integral, Real, Enum, Storable)
 
 newtype AttribLocation = AttribLocation { fromAttribLocation :: GLuint } 
@@ -28,6 +47,16 @@ newtype Program = Program { fromProgram :: GLuint }
 newtype Shader = Shader { fromShader :: GLuint } 
     deriving (Eq, Ord, Read, Show, Storable, Data, Typeable)
 
+
+data ShaderVar l t = ShaderVar
+    { varName     :: Text
+    , varLocation :: l
+    , varType     :: t
+    , varSize     :: Int
+    } deriving (Eq, Ord, Show, Data, Typeable)
+
+type ShaderAttrib = ShaderVar AttribLocation GLAttribType
+type ShaderUniform = ShaderVar UniformLocation GLUniformType
 
 -- | Handle to a VBO.
 newtype VBO = VBO { fromVBO :: GLuint } 
@@ -101,5 +130,48 @@ newtype VAO = VAO { fromVAO :: GLuint }
 
 instance GLObject VAO where
   glObjectName (VAO n) = fromIntegral n
+
+
+-- | Six values, one on each side.
+data Cube a = Cube
+  { cubeRight  :: a
+  , cubeLeft   :: a
+  , cubeTop    :: a
+  , cubeBottom :: a
+  , cubeFront  :: a
+  , cubeBack   :: a }
+    deriving (Show, Functor, Foldable, Traversable)
+
+instance Applicative Cube where
+  pure x = Cube x x x x x x
+  (Cube f1 f2 f3 f4 f5 f6) <*> (Cube x1 x2 x3 x4 x5 x6) =
+    Cube (f1 x1) (f2 x2) (f3 x3) (f4 x4) (f5 x5) (f6 x6)
+
+instance Monoid a => Monoid (Cube a) where
+  mempty = Cube mempty mempty mempty mempty mempty mempty
+  (Cube x1 x2 x3 x4 x5 x6) `mappend` (Cube y1 y2 y3 y4 y5 y6) = Cube
+    (x1 <> y1)
+    (x2 <> y2)
+    (x3 <> y3)
+    (x4 <> y4)
+    (x5 <> y5)
+    (x6 <> y6)
+
+
+data ShaderError = ShaderTypeError String
+                 | ProgramError ProgramError
+    deriving (Eq, Ord, Show, Data, Typeable)
+  
+instance Exception ShaderError
+
+-- | The error message emitted by the driver when shader compilation or
+-- linkage fails.
+data ProgramError =
+  VertexShaderError String |
+  FragmentShaderError String |
+  LinkError String
+    deriving (Eq, Ord, Show, Data, Typeable)
+  
+instance Exception ProgramError
 
 

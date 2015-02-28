@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 module Graphics.GL.Low.Classes where
 
 import Graphics.GL
@@ -29,6 +30,22 @@ instance ToGL Bool where
   toGL True = GL_TRUE
   toGL False = GL_FALSE
 
+
+class FromGL a where
+    fromGL :: GLenum -> Maybe a
+    
+    fromGLWith :: a -> GLenum -> a
+    fromGLWith def e = case fromGL e of
+        Just x  -> x
+        Nothing -> def
+    
+    fromGL' :: GLenum -> a
+    fromGL' e = fromGLWith (error $ "unexpected GLenum value " ++ show e) e
+
+instance FromGL Bool where
+    fromGL GL_TRUE  = Just True
+    fromGL GL_FALSE = Just False
+    fromGL _        = Nothing
 
 
 -- | All GL objects have some numeric name.

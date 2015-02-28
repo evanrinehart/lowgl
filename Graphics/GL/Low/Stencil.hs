@@ -22,19 +22,29 @@ module Graphics.GL.Low.Stencil (
   enableStencil,
   disableStencil,
   clearStencilBuffer,
+  noStencil,
   basicStencil,
   Stencil(..),
   StencilFunc(..),
   StencilOp(..)
 ) where
 
-import Data.Default
 import Data.Bits
 import Data.Word
 import Control.Monad.IO.Class
 
 import Graphics.GL
+import Graphics.GL.Low.Internal.Types
 import Graphics.GL.Low.Classes
+
+-- | Configuration of the stencil test and associated stencil buffer updating.
+data Stencil = Stencil
+  { func          :: StencilFunc
+  , ref           :: Int
+  , mask          :: Word
+  , onStencilFail :: StencilOp
+  , onDepthFail   :: StencilOp
+  , onBothPass    :: StencilOp }
 
 -- | Enable the stencil test with a set of operating parameters.
 enableStencil :: (MonadIO m) => Stencil -> m ()
@@ -62,25 +72,15 @@ clearStencilBuffer = glClear GL_STENCIL_BUFFER_BIT
 --     , onBothPass = Replace }
 -- @
 basicStencil :: Stencil
-basicStencil = def
+basicStencil = noStencil
   { func = Greater
   , ref = 1
   , onBothPass = Replace }
 
--- | Configuration of the stencil test and associated stencil buffer updating.
-data Stencil = Stencil
-  { func          :: StencilFunc
-  , ref           :: Int
-  , mask          :: Word
-  , onStencilFail :: StencilOp
-  , onDepthFail   :: StencilOp
-  , onBothPass    :: StencilOp }
-
 -- | The default state of the stencil, if it were simply enabled, would be
 -- to always pass and update nothing in the buffer. It would have no effect
 -- on rendering.
-instance Default Stencil where
-  def = Stencil
+noStencil = Stencil
     { func = Always
     , ref  = 0
     , mask = complement 0
@@ -92,51 +92,3 @@ instance Default Stencil where
 -- g :: t a -> [a] you can make a unique k such that g = k . f
 -- jle`
   
-
-
--- | The stencil test passes under what condition.
-data StencilFunc =
-  Never |
-  Less |
-  LessOrEqual |
-  Greater |
-  GreaterOrEqual |
-  Equal |
-  NotEqual |
-  Always
-    deriving Show
-
-instance ToGL StencilFunc where
-  toGL x = case x of
-    Never -> GL_NEVER
-    Less -> GL_LESS
-    LessOrEqual -> GL_LEQUAL
-    Greater -> GL_GREATER
-    GreaterOrEqual -> GL_GEQUAL
-    Equal -> GL_EQUAL
-    NotEqual -> GL_NOTEQUAL
-    Always -> GL_ALWAYS
-
-
--- | Modification action for the stencil buffer. 
-data StencilOp =
-  Keep | -- ^ Do nothing.
-  Zero | -- ^ Set to zero.
-  Replace | -- ^ Write the ref value passed to enableStencil.
-  Increment |
-  Decrement |
-  Invert | -- ^ Bitwise complement.
-  IncrementWrap |
-  DecrementWrap
-    deriving Show
-
-instance ToGL StencilOp where
-  toGL x = case x of
-    Keep -> GL_KEEP
-    Zero -> GL_ZERO
-    Replace -> GL_REPLACE
-    Increment -> GL_INCR
-    Decrement -> GL_DECR
-    Invert -> GL_INVERT
-    IncrementWrap -> GL_INCR_WRAP
-    DecrementWrap -> GL_DECR_WRAP

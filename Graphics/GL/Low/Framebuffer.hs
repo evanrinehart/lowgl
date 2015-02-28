@@ -48,21 +48,17 @@ import Foreign.Marshal
 import Foreign.Storable
 import Control.Monad.IO.Class
 
-import Data.Default
 import Graphics.GL
 
 import Graphics.GL.Low.Internal.Types
+import Graphics.GL.Low.Internal.Common
 import Graphics.GL.Low.Classes
-import Graphics.GL.Low.Common
 import Graphics.GL.Low.Cube
 import Graphics.GL.Low.Texture
 
 
 -- | The default framebuffer.
 data DefaultFramebuffer = DefaultFramebuffer deriving Show
-
-instance Default DefaultFramebuffer where
-  def = DefaultFramebuffer
 
 instance Framebuffer DefaultFramebuffer where
   framebufferName _ = 0

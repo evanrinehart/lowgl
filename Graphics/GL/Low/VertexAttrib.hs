@@ -18,7 +18,7 @@ module Graphics.GL.Low.VertexAttrib (
 
   setVertexLayout,
   VertexLayout(..),
-  DataType(..)
+  GLFloatType(..), Signedness(..), GLScalarType(..), GLVectorSize(..), GLAttribType(..)
 ) where
 
 
@@ -30,6 +30,7 @@ import Control.Monad (forM_)
 import Control.Monad.IO.Class
 
 import Graphics.GL
+import Graphics.GL.Low.Internal.Types
 import Graphics.GL.Low.Classes
 
 -- | The name of a vertex input to a program combined with the
@@ -37,20 +38,9 @@ import Graphics.GL.Low.Classes
 -- vertex data. Alternatively the size of an unused section of the data
 -- in bytes.
 data VertexLayout =
-  Attrib String Int DataType | -- ^ Name, component count and component format of a vertex attribute.
+  Attrib String Int GLAttribType | -- ^ Name, component count and component format of a vertex attribute.
   Unused Int -- ^ Size in bytes of an unused section of the vertex data.
     deriving Show
-
--- | The size and interpretation of a vertex attribute component.
-data DataType =
-  GLFloat         | -- ^ 4-byte float
-  GLByte          | -- ^ signed byte
-  GLUnsignedByte  | -- ^ unsigned byte
-  GLShort         | -- ^ 2-byte signed integer
-  GLUnsignedShort | -- ^ 2-byte unsigned integer
-  GLInt           | -- ^ 4-byte signed integer
-  GLUnsignedInt     -- ^ 4-byte unsigned integer
-    deriving (Eq, Show)
 
 -- | This configures the currently bound VAO. It calls glVertexAttribPointer
 -- and glEnableVertexAttribArray.
@@ -74,17 +64,7 @@ setVertexLayout layout = liftIO $ do
           (castPtr (nullPtr `plusPtr` offset))
         glEnableVertexAttribArray (fromIntegral attrib)
 
-
-instance ToGL DataType where
-  toGL GLFloat         = GL_FLOAT
-  toGL GLByte          = GL_BYTE
-  toGL GLUnsignedByte  = GL_UNSIGNED_BYTE
-  toGL GLShort         = GL_SHORT
-  toGL GLUnsignedShort = GL_UNSIGNED_SHORT
-  toGL GLInt           = GL_INT
-  toGL GLUnsignedInt   = GL_UNSIGNED_INT
-
-elaborateLayout :: Int -> [VertexLayout] -> [(String, Int, Int, DataType)]
+elaborateLayout :: Int -> [VertexLayout] -> [(String, Int, Int, GLAttribType)]
 elaborateLayout here layout = case layout of
   [] -> []
   (Unused n):xs -> elaborateLayout (here+n) xs
@@ -97,12 +77,16 @@ totalLayout layout = sum (map arraySize layout) where
   arraySize (Unused n) = n
   arraySize (Attrib _ n ty) = n * sizeOfType ty
 
-sizeOfType :: DataType -> Int
+sizeOfType :: GLAttribType -> Int
 sizeOfType c = case c of
-  GLFloat         -> 4
-  GLByte          -> 1
-  GLUnsignedByte  -> 1
-  GLShort         -> 2
-  GLUnsignedShort -> 2
-  GLInt           -> 4
-  GLUnsignedInt   -> 4
+  GLScalarAttrib (GLFloat Single) -> 4
+  GLScalarAttrib (GLFloat Double) -> 8
+  GLScalarAttrib (GLInteger _)    -> 4
+  GLVectorAttrib s Two            -> 2 * sizeOfType (GLScalarAttrib s)
+  GLVectorAttrib s Three          -> 3 * sizeOfType (GLScalarAttrib s)
+  GLVectorAttrib s Four           -> 4 * sizeOfType (GLScalarAttrib s)
+  GLMatrixAttrib s n Two          -> 2 * sizeOfType (GLVectorAttrib (GLFloat s) n)
+  GLMatrixAttrib s n Three        -> 3 * sizeOfType (GLVectorAttrib (GLFloat s) n)
+  GLMatrixAttrib s n Four         -> 4 * sizeOfType (GLVectorAttrib (GLFloat s) n)
+
+
