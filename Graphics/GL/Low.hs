@@ -95,7 +95,6 @@ module Graphics.GL.Low (
   GLScalarType(..),
   GLVectorSize(..),
 
-
   -- * Textures
   -- | See also "Graphics.GL.Low.Texture".
   newTexture2D,
@@ -113,6 +112,7 @@ module Graphics.GL.Low (
   Tex2D,
   CubeMap,
   Dimensions(..),
+  PixelFormat(..),
   Cube(..),
   Side,
   Filtering(..),
@@ -199,18 +199,13 @@ module Graphics.GL.Low (
   assertNoGLError,
 
   -- * Image Formats
-  Alpha,
-  Luminance,
-  LuminanceAlpha,
-  RGB,
-  RGBA,
-  Depth24,
-  Depth24Stencil8,
+  ColorImage(..),
+  DepthImage(..),
+  DepthStencilImage(..),
 
   -- * Classes
   ToGL(..),
   FromGL(..),
-  InternalFormat(..),
   Framebuffer(..),
   Texture(..),
   Attachable(..)
@@ -230,7 +225,6 @@ import Graphics.GL.Low.Color
 import Graphics.GL.Low.Depth
 import Graphics.GL.Low.Stencil
 import Graphics.GL.Low.Render
-import Graphics.GL.Low.ImageFormat
 import Graphics.GL.Low.Cube
 import Graphics.GL.Low.Error
 import Graphics.GL.Low.Internal.Types

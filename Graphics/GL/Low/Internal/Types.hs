@@ -97,6 +97,47 @@ instance GLObject (RBO a) where
   glObjectName (RBO n) = fromIntegral n
 
 
+data ColorImage = ColorImage deriving Show
+data DepthImage = DepthImage deriving Show
+data DepthStencilImage = DepthStencilImage deriving Show
+
+-- | The size and layout of a pixel.
+data PixelFormat =
+  RGB            | -- ^ 3-byte color
+  RGBA           | -- ^ 3-byte color then 1-byte alpha channel
+  Luminance      | -- ^ 1-byte grayscale
+  LuminanceAlpha | -- ^ 1-byte grayscale then 1-byte alpha channel
+  Alpha            -- ^ 1-byte alpha channel only
+    deriving (Eq, Ord, Read, Show, Data, Typeable)
+
+instance ToGL PixelFormat where
+  toGL x = case x of
+    RGB -> GL_RGB
+    RGBA -> GL_RGBA
+    Alpha -> GL_ALPHA
+    Luminance -> GL_LUMINANCE
+    LuminanceAlpha -> GL_LUMINANCE_ALPHA
+
+{-
+instance InternalFormat Depth24 where
+  internalFormat _ = GL_DEPTH_COMPONENT24
+instance InternalFormat Depth24Stencil8 where
+  internalFormat _ = GL_DEPTH24_STENCIL8
+-}
+
+instance Attachable ColorImage where
+  attachPoint _    = GL_COLOR_ATTACHMENT0
+  internalFormat _ = GL_RGBA
+
+instance Attachable DepthImage where
+  attachPoint _    = GL_DEPTH_ATTACHMENT
+  internalFormat _ = GL_DEPTH_COMPONENT24
+
+instance Attachable DepthStencilImage where
+  attachPoint _ = GL_DEPTH_STENCIL_ATTACHMENT
+  internalFormat _ = GL_DEPTH24_STENCIL8
+  
+
 -- | A 2D texture. A program can sample a texture if it has been bound to
 -- the appropriate texture unit.
 newtype Tex2D a = Tex2D { fromTex2D :: GLuint }

@@ -55,60 +55,60 @@ import Graphics.GL.Low.Classes
 import Graphics.GL.Low.Cube
 
 
--- | Create a new 2D texture from a blob and its dimensions. Dimensions should
--- be powers of two. The internal format type determines how the data is
--- interpreted.
-newTexture2D :: (MonadIO m, Storable a, InternalFormat b)
+-- | Create a new 2D texture from a blob, its dimensions, and its pixel format.
+newTexture2D :: (MonadIO m, Storable a)
              => Vector a
              -> Dimensions
-             -> m (Tex2D b)
-newTexture2D bytes (Dimensions w h)  = do
+             -> PixelFormat
+             -> m (Tex2D ColorImage)
+newTexture2D bytes (Dimensions w h) fmt = do
   n <- liftIO $ alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_2D n
   tex <- return (Tex2D n)
   liftIO . unsafeWith bytes $ \ptr -> glTexImage2D
     GL_TEXTURE_2D
     0
-    (internalFormat tex)
+    (toGL fmt)
     (fromIntegral w)
     (fromIntegral h)
     0
-    (internalFormat tex)
+    (toGL fmt)
     GL_UNSIGNED_BYTE
     (castPtr ptr)
   glGenerateMipmap GL_TEXTURE_2D
   return tex
 
--- | Create a new cube map texture from six blobs and their respective dimensions.
--- Dimensions should be powers of two.
-newCubeMap :: (MonadIO m, Storable a, InternalFormat b)
-           => Cube (Vector a, Dimensions)
-           -> m (CubeMap b)
+-- | Create a new cube map texture from six blobs and their respective
+-- dimensions.
+newCubeMap :: (MonadIO m, Storable a)
+           => Cube (Vector a, Dimensions, PixelFormat)
+           -> m (CubeMap ColorImage)
 newCubeMap images = do
   n <- liftIO $ alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_CUBE_MAP n
   cm <- return (CubeMap n)
-  let fmt = internalFormat cm
-  sequence (loadCubeMapSide fmt <$> images <*> cubeSideCodes)
+  sequence (loadCubeMapSide <$> images <*> cubeSideCodes)
   glGenerateMipmap GL_TEXTURE_CUBE_MAP
   return cm
 
-  
-loadCubeMapSide :: (MonadIO m, Storable a) => GLenum -> (Vector a, Dimensions) -> GLenum -> m ()
-loadCubeMapSide fmt (bytes, (Dimensions w h)) side = liftIO $ do
+loadCubeMapSide :: (MonadIO m, Storable a)
+                => (Vector a, Dimensions, PixelFormat)
+                -> GLenum
+                -> m ()
+loadCubeMapSide (bytes, (Dimensions w h), fmt) side = liftIO $ do
   unsafeWith bytes $ \ptr -> glTexImage2D
     side
     0
-    (fromIntegral fmt)
+    (toGL fmt)
     (fromIntegral w)
     (fromIntegral h)
     0
-    fmt
+    (toGL fmt)
     GL_UNSIGNED_BYTE
     (castPtr ptr)
 
 -- | Create an empty texture with the specified dimensions and format.
-newEmptyTexture2D :: (MonadIO m, InternalFormat a) => Int -> Int -> m (Tex2D a)
+newEmptyTexture2D :: (MonadIO m, Attachable a) => Int -> Int -> m (Tex2D a)
 newEmptyTexture2D w h = do
   let w' = fromIntegral w
   let h' = fromIntegral h
@@ -122,7 +122,7 @@ newEmptyTexture2D w h = do
 
 -- | Create a cubemap texture where each of the six sides has the specified
 -- dimensions and format.
-newEmptyCubeMap :: (MonadIO m, InternalFormat a) => Int -> Int -> m (CubeMap a)
+newEmptyCubeMap :: (MonadIO m, Attachable a) => Int -> Int -> m (CubeMap a)
 newEmptyCubeMap w h = do
   let w' = fromIntegral w
   let h' = fromIntegral h

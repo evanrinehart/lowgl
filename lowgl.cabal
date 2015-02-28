@@ -58,7 +58,6 @@ library
                        Graphics.GL.Low.Error
                        Graphics.GL.Low.EntirePictureUpFront
                        Graphics.GL.Low.Framebuffer
-                       Graphics.GL.Low.ImageFormat
                        Graphics.GL.Low.Render
                        Graphics.GL.Low.Shader
                        Graphics.GL.Low.Stencil

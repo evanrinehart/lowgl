@@ -63,7 +63,6 @@ data DefaultFramebuffer = DefaultFramebuffer deriving Show
 instance Framebuffer DefaultFramebuffer where
   framebufferName _ = 0
 
-
 -- | Binds an FBO or the default framebuffer to the framebuffer binding target.
 -- Replaces the framebuffer already bound there.
 bindFramebuffer :: (MonadIO m, Framebuffer a) => a -> m ()
@@ -107,7 +106,7 @@ attachRBO rbo = glFramebufferRenderbuffer
   GL_FRAMEBUFFER (attachPoint rbo) GL_RENDERBUFFER (unRBO rbo)
 
 -- | Create a new renderbuffer with the specified dimensions.
-newRBO :: (MonadIO m, InternalFormat a) => Int -> Int -> m (RBO a)
+newRBO :: (MonadIO m, Attachable a) => Int -> Int -> m (RBO a)
 newRBO w h = do
   n <- liftIO $ alloca (\ptr -> glGenRenderbuffers 1 ptr >> peek ptr)
   rbo <- return (RBO n)
