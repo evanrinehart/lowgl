@@ -10,7 +10,7 @@ name:                lowgl
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.3.1.1
+version:             0.4.0.0
 
 -- A short (one-line) description of the package.
 synopsis:            Basic gl wrapper and reference
@@ -83,7 +83,7 @@ library
                        transformers >= 0.4 && < 0.5,
                        vector >=0.10 && <0.11, 
                        linear >= 1.16 && <1.17,                       
-                       text >= 1.2 && < 1.3,
+                       text >= 1.0 && < 1.3,
                        bytestring >= 0.10 && < 0.11,
                        gl >=0.5 && <0.8
   
@@ -101,4 +101,4 @@ source-repository head
 source-repository this
   type: git
   location: https://github.com/evanrinehart/lowgl
-  tag: 0.3.1.1
+  tag: 0.4.0.0

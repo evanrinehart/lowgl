@@ -53,11 +53,12 @@ module Graphics.GL.Low (
 
   -- * Buffer Objects
   -- | See also "Graphics.GL.Low.BufferObject".
-  newVBO,
-  newElementArray,
+  newBufferObject,
   bindVBO,
-  bindElementArray,
+  loadVBO,
   updateVBO,
+  bindElementArray,
+  loadElementArray,
   updateElementArray,
   deleteBufferObject,
   VBO,

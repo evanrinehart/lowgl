@@ -14,18 +14,19 @@ import Graphics.GL
 import Graphics.GL.Low.Internal.Types
 import Graphics.GL.Low.Classes
 
-newBufferObject :: forall m a b. (MonadIO m, Storable a) => (GLuint -> b) -> GLenum -> Vector a -> GLenum -> m b
-newBufferObject ctor target src usage = do
-  n <- liftIO $ alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
-  glBindBuffer target n
+loadBufferObject :: forall m a . (MonadIO m, Storable a)
+                 => GLenum
+                 -> Vector a
+                 -> UsageHint
+                 -> m ()
+loadBufferObject target src usage = do
   let (fptr, off, len) = V.unsafeToForeignPtr src
   let size = sizeOf (undefined :: a)
   liftIO . withForeignPtr fptr $ \ptr -> glBufferData
     target
     (fromIntegral (len * size))
     (castPtr (ptr `plusPtr` off))
-    usage
-  return (ctor n)
+    (toGL usage)
 
 updateBufferObject :: forall m a. (MonadIO m, Storable a) => GLenum -> Vector a -> Int -> m ()
 updateBufferObject target bytes offset = do
@@ -36,5 +37,3 @@ updateBufferObject target bytes offset = do
     (fromIntegral offset)
     (fromIntegral (len * size))
     (castPtr (ptr `plusPtr` off))
-
-
