@@ -18,7 +18,7 @@ module Graphics.GL.Low.VertexAttrib (
 
   setVertexLayout,
   VertexLayout(..),
-  GLFloatType(..), Signedness(..), GLScalarType(..), GLVectorSize(..), GLAttribType(..)
+  AttribType(..)
 ) where
 
 
@@ -38,7 +38,7 @@ import Graphics.GL.Low.Classes
 -- vertex data. Alternatively the size of an unused section of the data
 -- in bytes.
 data VertexLayout =
-  Attrib String Int GLAttribType | -- ^ Name, component count and component format of a vertex attribute.
+  Attrib String Int AttribType | -- ^ Name, component count and component format of a vertex attribute.
   Unused Int -- ^ Size in bytes of an unused section of the vertex data.
     deriving Show
 
@@ -64,7 +64,7 @@ setVertexLayout layout = liftIO $ do
           (castPtr (nullPtr `plusPtr` offset))
         glEnableVertexAttribArray (fromIntegral attrib)
 
-elaborateLayout :: Int -> [VertexLayout] -> [(String, Int, Int, GLAttribType)]
+elaborateLayout :: Int -> [VertexLayout] -> [(String, Int, Int, AttribType)]
 elaborateLayout here layout = case layout of
   [] -> []
   (Unused n):xs -> elaborateLayout (here+n) xs
@@ -77,16 +77,13 @@ totalLayout layout = sum (map arraySize layout) where
   arraySize (Unused n) = n
   arraySize (Attrib _ n ty) = n * sizeOfType ty
 
-sizeOfType :: GLAttribType -> Int
+sizeOfType :: AttribType -> Int
 sizeOfType c = case c of
-  GLScalarAttrib (GLFloat Single) -> 4
-  GLScalarAttrib (GLFloat Double) -> 8
-  GLScalarAttrib (GLInteger _)    -> 4
-  GLVectorAttrib s Two            -> 2 * sizeOfType (GLScalarAttrib s)
-  GLVectorAttrib s Three          -> 3 * sizeOfType (GLScalarAttrib s)
-  GLVectorAttrib s Four           -> 4 * sizeOfType (GLScalarAttrib s)
-  GLMatrixAttrib s n Two          -> 2 * sizeOfType (GLVectorAttrib (GLFloat s) n)
-  GLMatrixAttrib s n Three        -> 3 * sizeOfType (GLVectorAttrib (GLFloat s) n)
-  GLMatrixAttrib s n Four         -> 4 * sizeOfType (GLVectorAttrib (GLFloat s) n)
-
-
+  GLFloat         -> 4
+  GLDouble        -> 8
+  GLByte          -> 1
+  GLUnsignedByte  -> 1
+  GLShort         -> 2
+  GLUnsignedShort -> 2
+  GLInt           -> 4
+  GLUnsignedInt   -> 4

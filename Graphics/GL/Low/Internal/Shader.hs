@@ -21,7 +21,7 @@ import Graphics.GL.Low.Classes
 
 setUniform :: (MonadIO m, Storable a)
            => (GLint -> GLsizei -> Ptr a -> IO ())
-           -> Text
+           -> String
            -> [a]
            -> m ()
 setUniform glAction name xs = liftIO . withArrayLen xs $ \n bytes -> do
@@ -29,7 +29,7 @@ setUniform glAction name xs = liftIO . withArrayLen xs $ \n bytes -> do
   if p == 0
     then return ()
     else do
-      loc <- T.withCStringLen name (\(ptr, _) -> glGetUniformLocation (fromIntegral p) ptr)
+      loc <- withCStringLen name (\(ptr, _) -> glGetUniformLocation (fromIntegral p) ptr)
       if loc == -1
         then return ()
         else glAction loc (fromIntegral n) bytes
@@ -93,46 +93,42 @@ activeUniformCount p = UniformIndex `liftM` getProgramiv p GL_ACTIVE_UNIFORMS
 activeUniformMaxLength :: (MonadIO m) => Program -> m GLsizei
 activeUniformMaxLength p = getProgramiv p GL_ACTIVE_UNIFORM_MAX_LENGTH
 
-getActiveAttrib :: (MonadIO m) => Program -> AttribIndex -> m (Text, GLAttribType, Int)
+getActiveAttrib :: (MonadIO m) => Program -> AttribIndex -> m (String, Int)
 getActiveAttrib p i = do
     maxLen <- activeAttributeMaxLength p
-    (n, ty, sz) <- getActive maxLen $ glGetActiveAttrib (fromProgram p) (fromAttribIndex i) maxLen
-    case fromGL ty of
-        Nothing     -> throwM . ShaderTypeError $ unwords ["Unknown GLSL type:", show ty, "for shader attribute", T.unpack n]
-        Just attrTy -> return $ (n, attrTy, fromIntegral sz)
+    (n, sz) <- getActive maxLen $ glGetActiveAttrib (fromProgram p) (fromAttribIndex i) maxLen
+    return (n, fromIntegral sz)
 
 getShaderAttrib :: (MonadIO m) => Program -> AttribIndex -> m ShaderAttrib
 getShaderAttrib p i = do
-    (n, ty, sz) <- getActiveAttrib p i
+    (n, sz) <- getActiveAttrib p i
     loc <- getAttribLocation p n
     loc' <- case loc of
-                Nothing -> throwM . ShaderTypeError $ "Error loading attrib " ++ T.unpack n
+                Nothing -> throwM . ShaderTypeError $ "Error loading attrib " ++ n
                 Just l  -> return l
-    return $ ShaderVar n loc' ty sz
+    return $ ShaderVar n loc' sz
 
-getActiveUniform :: (MonadIO m) => Program -> UniformIndex -> m (Text, GLUniformType, Int)
+getActiveUniform :: (MonadIO m) => Program -> UniformIndex -> m (String, Int)
 getActiveUniform p i = do
     maxLen <- activeUniformMaxLength p
-    (n, ty, sz) <- getActive maxLen $ glGetActiveUniform (fromProgram p) (fromUniformIndex i) maxLen
-    case fromGL ty of
-        Nothing     -> throwM . ShaderTypeError $ unwords ["Unknown GLSL type:", show ty, "for shader uniform", T.unpack n]
-        Just attrTy -> return $ (n, attrTy, fromIntegral sz)
+    (n, sz) <- getActive maxLen $ glGetActiveUniform (fromProgram p) (fromUniformIndex i) maxLen
+    return (n, fromIntegral sz)
 
 getShaderUniform :: (MonadIO m) => Program -> UniformIndex -> m ShaderUniform
 getShaderUniform p i = do
-    (n, ty, sz) <- getActiveUniform p i
+    (n, sz) <- getActiveUniform p i
     loc <- getUniformLocation p n
     loc' <- case loc of
-                Nothing -> throwM . ShaderTypeError $ "Error loading uniform " ++ T.unpack n
+                Nothing -> throwM . ShaderTypeError $ "Error loading uniform " ++ n
                 Just l  -> return l
-    return $ ShaderVar n loc' ty sz
+    return $ ShaderVar n loc' sz
 
-getAttribLocation :: (MonadIO m) => Program -> Text -> m (Maybe AttribLocation)
+getAttribLocation :: (MonadIO m) => Program -> String -> m (Maybe AttribLocation)
 getAttribLocation p name = do 
     loc <- liftIO . withGLstring name $ glGetAttribLocation (fromProgram p)
     return $ if loc >= 0 then Just $ fromIntegral loc else Nothing
 
-getUniformLocation :: (MonadIO m) => Program -> Text -> m (Maybe UniformLocation)
+getUniformLocation :: (MonadIO m) => Program -> String -> m (Maybe UniformLocation)
 getUniformLocation p name = do
     loc <- liftIO . withGLstring name $ glGetUniformLocation (fromProgram p)
     return $ if loc >= 0 then Just $ fromIntegral loc else Nothing
@@ -141,14 +137,16 @@ getUniformLocation p name = do
 
 
 
-getActive :: (MonadIO m) => GLsizei -> (Ptr GLsizei -> Ptr GLint -> Ptr GLenum -> Ptr GLchar -> IO ()) -> m (Text, GLenum, GLint)
+getActive :: (MonadIO m)
+          => GLsizei
+          -> (Ptr GLsizei -> Ptr GLint -> Ptr GLenum -> Ptr GLchar -> IO ())
+          -> m (String, GLint)
 getActive ml f = liftIO . alloca $ 
     \szb -> alloca $
     \tyb -> do
         n <- getGLstring ml (\nlb nb -> f nlb szb tyb nb)
-        ty <- peek tyb
         sz <- peek szb
-        return $ (n, ty, sz)
+        return $ (n, sz)
 
 getProgramiv :: (MonadIO m, Num a) => Program -> GLenum -> m a
 getProgramiv = getGLiv . glGetProgramiv . fromProgram

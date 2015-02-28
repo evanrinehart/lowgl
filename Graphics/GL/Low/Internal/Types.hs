@@ -48,15 +48,14 @@ newtype Shader = Shader { fromShader :: GLuint }
     deriving (Eq, Ord, Read, Show, Storable, Data, Typeable)
 
 
-data ShaderVar l t = ShaderVar
-    { varName     :: Text
+data ShaderVar l = ShaderVar
+    { varName     :: String
     , varLocation :: l
-    , varType     :: t
     , varSize     :: Int
     } deriving (Eq, Ord, Show, Data, Typeable)
 
-type ShaderAttrib = ShaderVar AttribLocation GLAttribType
-type ShaderUniform = ShaderVar UniformLocation GLUniformType
+type ShaderAttrib = ShaderVar AttribLocation
+type ShaderUniform = ShaderVar UniformLocation 
 
 -- | Handle to a generic buffer object.
 newtype BufferObject = BufferObject { fromBufferObject :: GLuint } 

@@ -89,11 +89,7 @@ module Graphics.GL.Low (
   -- | See also "Graphics.GL.Low.VertexAttrib".
   setVertexLayout,
   VertexLayout(..),
-  GLAttribType(..),
-  GLFloatType(..),
-  Signedness(..),
-  GLScalarType(..),
-  GLVectorSize(..),
+  AttribType(..),
 
   -- * Textures
   -- | See also "Graphics.GL.Low.Texture".
