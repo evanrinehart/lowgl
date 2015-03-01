@@ -1,3 +1,4 @@
+{-# LANGUAGE ScopedTypeVariables #-}
 module Graphics.GL.Low.Texture (
 
 -- | Textures are objects that contain image data that can be sampled by
@@ -41,19 +42,27 @@ import Prelude hiding (sequence)
 import Foreign.Ptr
 import Foreign.Marshal
 import Foreign.Storable
-import Data.Vector.Storable
+import Data.Vector.Storable hiding (mapM_)
 import Data.Word
 import Control.Applicative
 import Data.Traversable (sequence)
 import Control.Monad.IO.Class
 
 import Graphics.GL
+import Linear
 
 import Graphics.GL.Low.Internal.Types
 import Graphics.GL.Low.Internal.Common
+import Graphics.GL.Low.Internal.Texture
 import Graphics.GL.Low.Classes
 import Graphics.GL.Low.Cube
 
+
+bindNewTexture :: (MonadIO m, Texture a) => m a
+bindNewTexture = do
+    tex <- genTexture
+    bindTexture tex
+    return tex
 
 -- | Create a new 2D texture from a blob and its dimensions. Dimensions should
 -- be powers of two. The internal format type determines how the data is
@@ -62,20 +71,9 @@ newTexture2D :: (MonadIO m, Storable a, InternalFormat b)
              => Vector a
              -> Dimensions
              -> m (Tex2D b)
-newTexture2D bytes (Dimensions w h)  = do
-  n <- liftIO $ alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
-  glBindTexture GL_TEXTURE_2D n
-  tex <- return (Tex2D n)
-  liftIO . unsafeWith bytes $ \ptr -> glTexImage2D
-    GL_TEXTURE_2D
-    0
-    (internalFormat tex)
-    (fromIntegral w)
-    (fromIntegral h)
-    0
-    (internalFormat tex)
-    GL_UNSIGNED_BYTE
-    (castPtr ptr)
+newTexture2D bytes (Dimensions w h) = do
+  tex <- bindNewTexture
+  texImage2D GL_TEXTURE_2D 0 (internalFormat tex) (V2 w h) (internalFormat tex) GL_UNSIGNED_BYTE (Just bytes)
   glGenerateMipmap GL_TEXTURE_2D
   return tex
 
@@ -85,108 +83,34 @@ newCubeMap :: (MonadIO m, Storable a, InternalFormat b)
            => Cube (Vector a, Dimensions)
            -> m (CubeMap b)
 newCubeMap images = do
-  n <- liftIO $ alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
-  glBindTexture GL_TEXTURE_CUBE_MAP n
-  cm <- return (CubeMap n)
-  let fmt = internalFormat cm
-  sequence (loadCubeMapSide fmt <$> images <*> cubeSideCodes)
-  glGenerateMipmap GL_TEXTURE_CUBE_MAP
-  return cm
-
-  
-loadCubeMapSide :: (MonadIO m, Storable a) => GLenum -> (Vector a, Dimensions) -> GLenum -> m ()
-loadCubeMapSide fmt (bytes, (Dimensions w h)) side = liftIO $ do
-  unsafeWith bytes $ \ptr -> glTexImage2D
-    side
-    0
-    (fromIntegral fmt)
-    (fromIntegral w)
-    (fromIntegral h)
-    0
-    fmt
-    GL_UNSIGNED_BYTE
-    (castPtr ptr)
+    cm <- bindNewTexture
+    sequence (mkTx cm <$> images <*> cubeSideCodes)
+    glGenerateMipmap GL_TEXTURE_CUBE_MAP
+    return cm
+  where mkTx cm (bytes, Dimensions w h) side = texImage2D side 0 (internalFormat cm) (V2 w h) (internalFormat cm) GL_UNSIGNED_BYTE (Just bytes)
 
 -- | Create an empty texture with the specified dimensions and format.
-newEmptyTexture2D :: (MonadIO m, InternalFormat a) => Int -> Int -> m (Tex2D a)
+newEmptyTexture2D :: forall a m. (MonadIO m, Storable a, InternalFormat a) => Int -> Int -> m (Tex2D a)
 newEmptyTexture2D w h = do
-  let w' = fromIntegral w
-  let h' = fromIntegral h
-  n <- liftIO $ alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
-  tex <- return (Tex2D n)
-  let fmt = internalFormat tex
-  let fmt' = internalFormat tex
-  glBindTexture GL_TEXTURE_2D n
-  glTexImage2D GL_TEXTURE_2D 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
+  tex <- bindNewTexture
+  texImage2D GL_TEXTURE_2D 0 (internalFormat tex) (V2 w h) (internalFormat tex) GL_UNSIGNED_BYTE (Nothing :: Maybe (Vector a))
   return tex
 
 -- | Create a cubemap texture where each of the six sides has the specified
 -- dimensions and format.
-newEmptyCubeMap :: (MonadIO m, InternalFormat a) => Int -> Int -> m (CubeMap a)
+newEmptyCubeMap :: forall a m. (MonadIO m, Storable a, InternalFormat a) => Int -> Int -> m (CubeMap a)
 newEmptyCubeMap w h = do
-  let w' = fromIntegral w
-  let h' = fromIntegral h
-  n <- liftIO $ alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
-  tex <- return (CubeMap n)
-  let fmt = internalFormat tex
-  let fmt' = internalFormat tex
-  glBindTexture GL_TEXTURE_CUBE_MAP n
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_X 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_X 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Y 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
-  glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
-  return tex
-  
--- | Delete a texture.
-deleteTexture :: (MonadIO m, Texture a) => a -> m ()
-deleteTexture x = liftIO $ withArray [glObjectName x] (\ptr -> glDeleteTextures 1 ptr)
+    tex <- bindNewTexture
+    mapM_ (mkTx tex) [ GL_TEXTURE_CUBE_MAP_POSITIVE_X
+                     , GL_TEXTURE_CUBE_MAP_NEGATIVE_X
+                     , GL_TEXTURE_CUBE_MAP_POSITIVE_Y
+                     , GL_TEXTURE_CUBE_MAP_NEGATIVE_Y
+                     , GL_TEXTURE_CUBE_MAP_POSITIVE_Z
+                     , GL_TEXTURE_CUBE_MAP_NEGATIVE_Z
+                     ]
+    return tex
+  where mkTx tex target = texImage2D target 0 (internalFormat tex) (V2 w h) (internalFormat tex) GL_UNSIGNED_BYTE (Nothing :: Maybe (Vector a))
 
--- | Bind a 2D texture to the 2D texture binding target and the currently
--- active texture unit.
-bindTexture2D :: (MonadIO m) => Tex2D a -> m ()
-bindTexture2D (Tex2D n) = glBindTexture GL_TEXTURE_2D n
-
--- | Bind a cubemap texture to the cubemap texture binding target and
--- the currently active texture unit.
-bindTextureCubeMap :: (MonadIO m) => CubeMap a -> m ()
-bindTextureCubeMap (CubeMap n) = glBindTexture GL_TEXTURE_CUBE_MAP n
-
--- | Set the active texture unit. The default is zero.
-setActiveTextureUnit :: (MonadIO m, Enum a) => a -> m ()
-setActiveTextureUnit n =
-  (glActiveTexture . fromIntegral) (GL_TEXTURE0 + fromEnum n)
-
--- | Set the filtering for the 2D texture currently bound to the 2D texture
--- binding target.
-setTex2DFiltering :: (MonadIO m) => Filtering -> m ()
-setTex2DFiltering filt = do
-  glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MIN_FILTER (toGL filt)
-  glTexParameteri GL_TEXTURE_2D GL_TEXTURE_MAG_FILTER (toGL filt)
-
--- | Set the filtering for the cubemap texture currently bound to the cubemap
--- texture binding target.
-setCubeMapFiltering :: (MonadIO m) => Filtering -> m ()
-setCubeMapFiltering filt = do
-  glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_MIN_FILTER (toGL filt)
-  glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_MAG_FILTER (toGL filt)
-
--- | Set the wrapping mode for the 2D texture currently bound to the 2D
--- texture binding target.
-setTex2DWrapping :: (MonadIO m) => Wrapping -> m ()
-setTex2DWrapping wrap = do
-  glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_S (toGL wrap)
-  glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T (toGL wrap)
-
--- | Set the wrapping mode for the cubemap texture currently bound to the
--- cubemap texture binding target. Because no blending occurs between cube
--- faces you probably want ClampToEdge.
-setCubeMapWrapping :: (MonadIO m) => Wrapping -> m ()
-setCubeMapWrapping wrap = do
-  glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_S (toGL wrap)
-  glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_T (toGL wrap)
-  glTexParameteri GL_TEXTURE_CUBE_MAP GL_TEXTURE_WRAP_R (toGL wrap)
 
 -- | The size of an image in pixels.
 data Dimensions = Dimensions

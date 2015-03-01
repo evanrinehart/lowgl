@@ -31,9 +31,8 @@ module Graphics.GL.Low.Shader (
 -- - a color (this is more complicated in reality but close enough)
 -- - the depth of the pixel, gl_FragDepth, which will default to the pixel's Z.
 --
-  newProgram, newProgramSafe, makeProgram, deleteProgram,
-  
-  newShader,
+  newProgram, newProgramSafe, makeProgram, loadProgram, deleteProgram,
+  newShader, newShaderSafe, loadShader, loadShaderType, guessShaderFileType,
   
   activeAttribs, activeUniforms,
   
@@ -62,12 +61,18 @@ import Foreign.C.String
 import Foreign.Marshal
 import Foreign.Storable
 import Control.Exception
+import Control.Applicative
 import Control.Monad (when, forM_)
+import Data.Tuple (swap)
+import Data.List (isPrefixOf, isSuffixOf)
 import Data.Typeable
 import Control.Monad.IO.Class
+import Control.Monad.State (state, runState)
+import System.FilePath
 
 import Data.Text (Text)
 import qualified Data.Text as T
+import Control.Monad.Loops
 
 import Graphics.GL
 import Linear
@@ -83,6 +88,10 @@ import Graphics.GL.Low.VertexAttrib
 newProgramSafe :: (MonadIO m) => String -> String -> m (Either ProgramError Program)
 newProgramSafe vcode fcode = liftIO . try $ newProgram vcode fcode
 
+newShaderSafe :: (MonadIO m) => String -> ShaderType -> m (Either ProgramError Shader)
+newShaderSafe src ty = liftIO . try $ newShader src ty
+
+
 -- | Compile the code for a vertex shader and a fragment shader, then link
 -- them into a new program. If the compiler or linker fails it will throw
 -- a ProgramError.
@@ -94,18 +103,6 @@ newProgram vcode fcode = do
   vertexShader <- newShader vcode VertexShader
   fragmentShader <- newShader fcode FragmentShader
   makeProgram [vertexShader, fragmentShader]
-
-makeProgram :: (MonadIO m) => [Shader] -> m Program
-makeProgram shaders = do
-    program <- createProgram
-    mapM_ (attachShader program) shaders
-    linkProgram program
-    linked <- linkStatus program
-    when (not linked) $ do
-        errors <- programInfoLog program
-        throwM $ LinkError errors
-    mapM_ deleteShader shaders
-    return program
 
 newShader :: (MonadIO m) => String -> ShaderType -> m Shader
 newShader code vertOrFrag = do
@@ -119,6 +116,45 @@ newShader code vertOrFrag = do
       VertexShader -> throwM $ VertexShaderError errors
       FragmentShader -> throwM $ FragmentShaderError errors
   return shader
+
+-- | Compile a collection of shaders into a program, then delete the shader objects.
+--   Throws exceptions on compile/link failure.
+makeProgram :: (MonadIO m) => [Shader] -> m Program
+makeProgram shaders = do
+    program <- createProgram
+    mapM_ (attachShader program) shaders
+    linkProgram program
+    linked <- linkStatus program
+    when (not linked) $ do
+        errors <- programInfoLog program
+        throwM $ LinkError errors
+    mapM_ (detachShader program) shaders
+    mapM_ deleteShader shaders
+    return program
+
+loadShader :: (MonadIO m) => FilePath -> m Shader
+loadShader path = case guessShaderFileType path of
+    Nothing -> throwM . ShaderError Nothing $ "couldn't guess shader type from file name: " ++ path
+    Just ty -> loadShaderType ty path
+
+loadShaderType :: (MonadIO m) => ShaderType -> FilePath -> m Shader
+loadShaderType ty path = do
+    src <- liftIO $ readFile path
+    newShader src ty
+
+loadProgram :: (MonadIO m) => [FilePath] -> m Program
+loadProgram paths = makeProgram =<< mapM loadShader paths
+
+guessShaderFileType :: FilePath -> Maybe ShaderType
+guessShaderFileType path 
+    | any (check "v") exts'   = Just VertexShader
+    | any (check "f") exts'   = Just FragmentShader
+    | "-vs" `isSuffixOf` base = Just VertexShader
+    | "-fs" `isSuffixOf` base = Just FragmentShader
+    | otherwise               = Nothing
+  where (exts, base) = runState (unfoldWhileM (not . null) (state $ swap . splitExtension)) path
+        exts' = dropWhile (== '.') <$> exts
+        check x ext = x `isPrefixOf` ext || x `isSuffixOf` ext
 
 
 activeAttribs :: (MonadIO m) => Program -> m [ShaderAttrib]

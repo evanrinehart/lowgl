@@ -10,7 +10,7 @@ import Graphics.GL.Low.Classes (ToGL(..), FromGL(..))
 
 -- | Either a vertex shader or a fragment shader.
 data ShaderType = VertexShader | FragmentShader 
-  deriving (Eq, Ord, Show, Read)
+  deriving (Eq, Ord, Show, Read, Data, Typeable)
 
 instance ToGL ShaderType where
   toGL VertexShader = GL_VERTEX_SHADER
@@ -23,7 +23,7 @@ data BlendEquation =
   FuncAdd | -- ^ the default
   FuncSubtract |
   FuncReverseSubtract
-    deriving (Eq, Ord, Show, Read)
+    deriving (Eq, Ord, Show, Read, Data, Typeable)
 
 instance ToGL BlendEquation where
   toGL FuncAdd = GL_FUNC_ADD
@@ -47,7 +47,7 @@ data BlendFactor =
   BlendOneMinusConstantColor |
   BlendConstantAlpha |
   BlendOneMinusConstantAlpha
-    deriving Show
+    deriving (Eq, Ord, Show, Read, Data, Typeable)
 
 instance ToGL BlendFactor where
   toGL BlendOne = GL_ONE
@@ -71,7 +71,7 @@ instance ToGL BlendFactor where
 data UsageHint = StaticDraw  -- ^ Data will seldomly change.
                | DynamicDraw -- ^ Data will change.
                | StreamDraw  -- ^ Data will change very often.
-                 deriving Show
+                 deriving (Eq, Ord, Show, Read, Data, Typeable)
 
 instance ToGL UsageHint where
   toGL StaticDraw  = GL_STATIC_DRAW

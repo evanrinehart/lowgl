@@ -25,16 +25,22 @@ setUniform :: (MonadIO m, Storable a)
            -> [a]
            -> m ()
 setUniform glAction name xs = liftIO . withArrayLen xs $ \n bytes -> do
-  p <- alloca (\ptr -> glGetIntegerv GL_CURRENT_PROGRAM ptr >> peek ptr)
-  if p == 0
-    then return ()
-    else do
-      loc <- T.withCStringLen name (\(ptr, _) -> glGetUniformLocation (fromIntegral p) ptr)
-      if loc == -1
-        then return ()
-        else glAction loc (fromIntegral n) bytes
+  --  p <- alloca (\ptr -> glGetIntegerv GL_CURRENT_PROGRAM ptr >> peek ptr)
+  p <- currentProgram
+  case p of
+    Nothing   -> return ()
+    Just prog -> do
+        --  loc <- T.withCStringLen name (\(ptr, _) -> glGetUniformLocation (fromProgram p) ptr)
+        l <- getUniformLocation prog name
+        case l of
+            Nothing  -> return ()
+            Just loc -> glAction (fromIntegral $ fromUniformLocation loc) (fromIntegral n) bytes
 
 
+currentProgram :: (MonadIO m) => m (Maybe Program)
+currentProgram = do
+    p <- getIntegerv GL_CURRENT_PROGRAM
+    return $ if p > 0 then Just $ Program p else Nothing
 
 createProgram :: (MonadIO m) => m Program
 createProgram = liftM Program glCreateProgram
@@ -45,6 +51,9 @@ deleteProgram (Program n) = glDeleteProgram n
 
 attachShader :: (MonadIO m) => Program -> Shader -> m ()
 attachShader p s = glAttachShader (fromProgram p) (fromShader s)
+
+detachShader :: (MonadIO m) => Program -> Shader -> m ()
+detachShader p s = glDetachShader (fromProgram p) (fromShader s)
 
 linkProgram :: (MonadIO m) => Program -> m ()
 linkProgram p = glLinkProgram (fromProgram p)
@@ -130,12 +139,12 @@ getShaderUniform p i = do
 getAttribLocation :: (MonadIO m) => Program -> Text -> m (Maybe AttribLocation)
 getAttribLocation p name = do 
     loc <- liftIO . withGLstring name $ glGetAttribLocation (fromProgram p)
-    return $ if loc >= 0 then Just $ fromIntegral loc else Nothing
+    return $ if loc >= 0 then Just . AttribLocation $ fromIntegral loc else Nothing
 
 getUniformLocation :: (MonadIO m) => Program -> Text -> m (Maybe UniformLocation)
 getUniformLocation p name = do
     loc <- liftIO . withGLstring name $ glGetUniformLocation (fromProgram p)
-    return $ if loc >= 0 then Just $ fromIntegral loc else Nothing
+    return $ if loc >= 0 then Just . UniformLocation $ fromIntegral loc else Nothing
 
 
 
@@ -155,6 +164,9 @@ getProgramiv = getGLiv . glGetProgramiv . fromProgram
 
 getShaderiv :: (MonadIO m, Num a) => Shader -> GLenum -> m a
 getShaderiv = getGLiv . glGetShaderiv . fromShader
+
+getIntegerv :: (MonadIO m, Num a) => GLenum -> m a
+getIntegerv = getGLiv glGetIntegerv
 
 getGLiv :: (MonadIO m, Storable a, Integral a, Num c) => (GLenum -> Ptr a -> IO b) -> GLenum -> m c
 getGLiv f enum = liftIO . alloca $ 

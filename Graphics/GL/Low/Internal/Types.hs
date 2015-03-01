@@ -1,3 +1,4 @@
+{-# LANGUAGE PatternSynonyms #-}
 {-# LANGUAGE DeriveDataTypeable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveFoldable #-}
@@ -32,20 +33,20 @@ newtype AttribIndex = AttribIndex { fromAttribIndex :: GLuint }
 newtype UniformIndex = UniformIndex { fromUniformIndex :: GLuint } 
     deriving (Eq, Ord, Read, Show, Num, Integral, Real, Enum, Storable)
 
+
 newtype AttribLocation = AttribLocation { fromAttribLocation :: GLuint } 
-    deriving (Eq, Ord, Read, Show, Num, Integral, Real, Enum, Storable)
+    deriving (Eq, Ord, Show, Storable, Data, Typeable)
 
 newtype UniformLocation = UniformLocation { fromUniformLocation :: GLuint } 
-    deriving (Eq, Ord, Read, Show, Num, Integral, Real, Enum, Storable)
-
+    deriving (Eq, Ord, Show, Storable, Data, Typeable)
 
 -- | Handle to a shader program.
 newtype Program = Program { fromProgram :: GLuint } 
-    deriving (Eq, Ord, Read, Show, Storable, Data, Typeable)
+    deriving (Eq, Ord, Show, Storable, Data, Typeable)
 
 -- | Handle to a shader object.
 newtype Shader = Shader { fromShader :: GLuint } 
-    deriving (Eq, Ord, Read, Show, Storable, Data, Typeable)
+    deriving (Eq, Ord, Show, Storable, Data, Typeable)
 
 
 data ShaderVar l t = ShaderVar
@@ -64,6 +65,7 @@ newtype VBO = VBO { fromVBO :: GLuint }
 
 instance GLObject VBO where
   glObjectName (VBO n) = fromIntegral n
+  glObject = VBO . fromIntegral
 
 instance BufferObject VBO
 
@@ -74,6 +76,7 @@ newtype ElementArray = ElementArray { fromElementArray :: GLuint }
 
 instance GLObject ElementArray where
   glObjectName (ElementArray n) = fromIntegral n
+  glObject = ElementArray . fromIntegral
 
 instance BufferObject ElementArray
 
@@ -90,6 +93,7 @@ instance Framebuffer FBO where
 
 instance GLObject FBO where
   glObjectName (FBO n) = fromIntegral n
+  glObject = FBO . fromIntegral
 
 
 -- | An RBO is a kind of image object used for rendering. The only thing
@@ -99,6 +103,7 @@ newtype RBO a = RBO { unRBO :: GLuint }
 
 instance GLObject (RBO a) where
   glObjectName (RBO n) = fromIntegral n
+  glObject = RBO . fromIntegral
 
 
 -- | A 2D texture. A program can sample a texture if it has been bound to
@@ -107,9 +112,11 @@ newtype Tex2D a = Tex2D { fromTex2D :: GLuint }
     deriving (Eq, Ord, Read, Show, Storable, Data, Typeable)
 
 instance Texture (Tex2D a) where
+    bindTexture = glBindTexture GL_TEXTURE_2D . glObjectName
 
 instance GLObject (Tex2D a) where
   glObjectName (Tex2D n) = fromIntegral n
+  glObject = Tex2D . fromIntegral
 
 
 -- | A cubemap texture is just six 2D textures. A program can sample a cubemap
@@ -118,10 +125,11 @@ newtype CubeMap a = CubeMap { fromCubeMap :: GLuint }
     deriving (Eq, Ord, Read, Show, Storable, Data, Typeable)
 
 instance Texture (CubeMap a) where
+    bindTexture = glBindTexture GL_TEXTURE_CUBE_MAP . glObjectName
 
 instance GLObject (CubeMap a) where
   glObjectName (CubeMap n) = fromIntegral n
-
+  glObject = CubeMap . fromIntegral
 
 
 -- | Handle to a VAO.
@@ -130,6 +138,7 @@ newtype VAO = VAO { fromVAO :: GLuint }
 
 instance GLObject VAO where
   glObjectName (VAO n) = fromIntegral n
+  glObject = VAO . fromIntegral
 
 
 -- | Six values, one on each side.
@@ -166,12 +175,13 @@ instance Exception ShaderError
 
 -- | The error message emitted by the driver when shader compilation or
 -- linkage fails.
-data ProgramError =
-  VertexShaderError String |
-  FragmentShaderError String |
-  LinkError String
+data ProgramError = ShaderError (Maybe ShaderType) String
+                  | LinkError String
     deriving (Eq, Ord, Show, Data, Typeable)
-  
+
+pattern VertexShaderError s = ShaderError (Just VertexShader) s
+pattern FragmentShaderError s = ShaderError (Just FragmentShader) s
+
 instance Exception ProgramError
 
 

@@ -2,6 +2,7 @@
 module Graphics.GL.Low.Classes where
 
 import Graphics.GL
+import Control.Monad.IO.Class
 
 -- | OpenGL internal image formats.
 class InternalFormat a where
@@ -13,6 +14,7 @@ class InternalFormat a => Attachable a where
 
 -- | Textures are GL objects.
 class GLObject a => Texture a where
+    bindTexture :: (MonadIO m) => a -> m ()
 
 -- | Framebuffers can be bound to the framebuffer binding target. There is
 -- a default framebuffer and the client may create an arbitrary number of
@@ -50,5 +52,6 @@ instance FromGL Bool where
 
 -- | All GL objects have some numeric name.
 class GLObject a where
-  glObjectName :: Num b => a -> b
+    glObjectName :: (Num b) => a -> b
+    glObject     :: (Integral b) => b -> a
 
