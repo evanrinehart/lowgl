@@ -49,6 +49,8 @@ module Graphics.GL.Low (
   newVAO,
   bindVAO,
   deleteVAO,
+  withNewVAO,
+  withVAO,
   VAO,
 
   -- * Buffer Objects

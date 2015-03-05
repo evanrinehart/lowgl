@@ -58,6 +58,8 @@ module Graphics.GL.Low.VAO (
   newVAO,
   deleteVAO,
   bindVAO,
+  withVAO,
+  withNewVAO,
   VAO
 ) where
 
@@ -83,5 +85,22 @@ deleteVAO (VAO n) = liftIO $ withArray [n] (\ptr -> glDeleteVertexArrays 1 ptr)
 
 -- | Assign the VAO to the vertex array binding target. The VAO already bound
 -- will be replaced, if any.
-bindVAO :: (MonadIO m) => VAO -> m ()
-bindVAO (VAO n) = glBindVertexArray n
+bindVAO :: (MonadIO m) => Maybe VAO -> m ()
+bindVAO (Just (VAO n)) = glBindVertexArray n
+bindVAO Nothing = glBindVertexArray 0
+
+-- | Run an action with the VAO bound and unbind the VAO afterwards.
+withVAO :: (MonadIO m) => VAO -> m a -> m a
+withVAO vao action = do
+    bindVAO (Just vao)
+    r <- action
+    bindVAO Nothing
+    return r
+
+withNewVAO :: (MonadIO m) => m () -> m VAO
+withNewVAO action = do
+    vao <- newVAO
+    _ <- withVAO vao action
+    return vao
+
+

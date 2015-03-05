@@ -34,7 +34,7 @@ module Graphics.GL.Low.Shader (
   newProgram, newProgramSafe, makeProgram, loadProgram, deleteProgram,
   newShader, newShaderSafe, loadShader, loadShaderType, guessShaderFileType,
   
-  activeAttribs, activeUniforms,
+  activeAttribs, activeUniforms, GLScalar(..),
   
   useProgram, 
   
@@ -184,6 +184,20 @@ shaderInfoLog s = do
             glGetShaderInfoLog (fromShader s) (fromIntegral len) nullPtr ptr
             peekCString ptr
 
+
+class GLScalar t where
+    glScalar :: t -> Maybe GLScalarType
+
+instance GLScalar GLAttribType where
+    glScalar (GLScalarAttrib s) = Just s
+    glScalar (GLVectorAttrib s _) = Just s
+    glScalar (GLMatrixAttrib f _ _) = Just $ GLFloat f
+
+instance GLScalar GLUniformType where
+    glScalar (GLScalarUniform s) = Just s
+    glScalar (GLVectorUniform s _) = Just s
+    glScalar (GLMatrixUniform f _ _) = Just $ GLFloat f
+    glScalar _ = Nothing
 
 -- | Install a program into the rendering pipeline. Replaces the program
 -- already in use, if any.
