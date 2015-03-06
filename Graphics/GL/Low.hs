@@ -49,6 +49,8 @@ module Graphics.GL.Low (
   newVAO,
   bindVAO,
   deleteVAO,
+  withNewVAO,
+  withVAO,
   VAO,
 
   -- * Buffer Objects
@@ -88,7 +90,11 @@ module Graphics.GL.Low (
   -- | See also "Graphics.GL.Low.VertexAttrib".
   setVertexLayout,
   VertexLayout(..),
-  DataType(..),
+  GLAttribType(..),
+  GLFloatType(..),
+  Signedness(..),
+  GLScalarType(..),
+  GLVectorSize(..),
 
 
   -- * Textures
@@ -203,12 +209,15 @@ module Graphics.GL.Low (
   Depth24Stencil8,
 
   -- * Classes
+  ToGL(..),
+  FromGL(..),
   InternalFormat(..),
   Framebuffer(..),
   Texture(..),
   Attachable(..)
 
 ) where
+
 
 import Graphics.GL.Low.Classes
 import Graphics.GL.Low.VAO
@@ -225,3 +234,4 @@ import Graphics.GL.Low.Render
 import Graphics.GL.Low.ImageFormat
 import Graphics.GL.Low.Cube
 import Graphics.GL.Low.Error
+import Graphics.GL.Low.Internal.Types

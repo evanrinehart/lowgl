@@ -15,7 +15,9 @@ module Graphics.GL.Low.Blending (
 
   enableBlending,
   disableBlending,
+  noBlending,
   basicBlending,
+  premultipliedBlending,
   Blending(..),
   BlendFactor(..),
   BlendEquation(..)
@@ -25,10 +27,17 @@ module Graphics.GL.Low.Blending (
 ) where
 
 import Control.Monad.IO.Class
-import Data.Default
 import Graphics.GL
 
 import Graphics.GL.Low.Classes
+import Graphics.GL.Low.Internal.Types
+
+-- | Blending parameters.
+data Blending = Blending
+  { sFactor :: BlendFactor
+  , dFactor :: BlendFactor
+  , blendFunc :: BlendEquation
+  , blendColor :: (Float,Float,Float,Float) }
 
 -- | Enable blending with the specified blending parameters.
 enableBlending :: (MonadIO m) => Blending -> m ()
@@ -53,76 +62,29 @@ disableBlending = glDisable GL_BLEND
 --   , blendFunc = FuncAdd }
 -- @
 basicBlending :: Blending
-basicBlending = def
+basicBlending = noBlending
   { sFactor = BlendSourceAlpha
   , dFactor = BlendOneMinusSourceAlpha }
 
-
--- | Blending parameters.
-data Blending = Blending
-  { sFactor :: BlendFactor
-  , dFactor :: BlendFactor
-  , blendFunc :: BlendEquation
-  , blendColor :: (Float,Float,Float,Float) }
-
--- | The default blending parameters have no effect if enabled. The result
--- will be no blending effect.
-instance Default Blending where
-  def = Blending
+-- | This configuration produces no blending effect.
+noBlending = Blending
     { sFactor = BlendOne
     , dFactor = BlendZero
     , blendFunc = FuncAdd
     , blendColor = (0,0,0,0) }
 
--- | Blending functions.
-data BlendEquation =
-  FuncAdd | -- ^ the default
-  FuncSubtract |
-  FuncReverseSubtract
-    deriving (Eq, Ord, Show, Read)
-
-instance Default BlendEquation where
-  def = FuncAdd
-
-instance ToGL BlendEquation where
-  toGL FuncAdd = GL_FUNC_ADD
-  toGL FuncSubtract = GL_FUNC_SUBTRACT
-  toGL FuncReverseSubtract = GL_FUNC_REVERSE_SUBTRACT
-
-
--- | Blending factors.
-data BlendFactor =
-  BlendOne |
-  BlendZero |
-  BlendSourceColor |
-  BlendOneMinusSourceColor |
-  BlendDestColor |
-  BlendOneMinusDestColor |
-  BlendSourceAlpha |
-  BlendOneMinusSourceAlpha |
-  BlendDestAlpha |
-  BlendOneMinusDestAlpha |
-  BlendConstantColor |
-  BlendOneMinusConstantColor |
-  BlendConstantAlpha |
-  BlendOneMinusConstantAlpha
-    deriving Show
-
-instance ToGL BlendFactor where
-  toGL BlendOne = GL_ONE
-  toGL BlendZero = GL_ZERO
-  toGL BlendSourceColor = GL_SRC_COLOR
-  toGL BlendOneMinusSourceColor = GL_ONE_MINUS_SRC_COLOR
-  toGL BlendDestColor = GL_DST_COLOR
-  toGL BlendOneMinusDestColor = GL_ONE_MINUS_DST_COLOR
-  toGL BlendSourceAlpha = GL_SRC_ALPHA
-  toGL BlendOneMinusSourceAlpha = GL_ONE_MINUS_SRC_ALPHA
-  toGL BlendDestAlpha = GL_DST_ALPHA
-  toGL BlendOneMinusDestAlpha = GL_ONE_MINUS_DST_ALPHA
-  toGL BlendConstantColor = GL_ONE_MINUS_CONSTANT_COLOR
-  toGL BlendOneMinusConstantColor = GL_ONE_MINUS_CONSTANT_COLOR
-  toGL BlendConstantAlpha = GL_CONSTANT_ALPHA
-  toGL BlendOneMinusConstantAlpha = GL_ONE_MINUS_CONSTANT_ALPHA
+-- | This blending configuration is suitable for premultiplied alpha blending.
+--
+-- @
+-- Blending
+--   { sFactor   = BlendOne
+--   , dFactor   = BlendOneMinusSourceAlpha
+--   , blendFunc = FuncAdd }
+-- @
+premultipliedBlending :: Blending
+premultipliedBlending = noBlending
+    { sFactor = BlendOne
+    , dFactor = BlendOneMinusSourceAlpha }
 
 
 -- $example
