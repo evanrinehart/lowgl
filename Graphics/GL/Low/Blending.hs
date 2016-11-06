@@ -199,7 +199,7 @@ instance ToGL BlendFactor where
 -- drawGreen = do
 --   setUniform3f "color" [V3 0 1 0]
 --   setUniform1f "alpha" [0.5]
---   setUniform44 "move" [eye4]
+--   setUniform44 "move" [identity]
 --   drawTriangles 3
 -- 
 -- drawRed = do

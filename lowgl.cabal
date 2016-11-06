@@ -10,7 +10,7 @@ name:                lowgl
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.3.1.1
+version:             0.3.1.2
 
 -- A short (one-line) description of the package.
 synopsis:            Basic gl wrapper and reference
@@ -75,10 +75,10 @@ library
   -- other-extensions:    
   
   -- Other library packages from which modules are imported.
-  build-depends:       base >=4.7 && <4.8, 
+  build-depends:       base >=4.7 && <=4.9, 
                        transformers >= 0.4 && < 0.5,
                        vector >=0.10 && <0.11, 
-                       linear >= 1.16 && <1.17, 
+                       linear >= 1.16 && <1.21, 
                        gl >=0.5 && <0.8, 
                        data-default
   
@@ -96,4 +96,4 @@ source-repository head
 source-repository this
   type: git
   location: https://github.com/evanrinehart/lowgl
-  tag: 0.3.1.1
+  tag: 0.3.1.2
