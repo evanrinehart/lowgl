@@ -78,12 +78,12 @@ instance ToGL UsageHint where
   toGL StreamDraw  = GL_STREAM_DRAW
 
 -- | Use this to create VBOs or element arrays from raw data.
--- This operation clobbers the array buffer binding target.
 newBufferObject :: Storable a => Vector a -> UsageHint -> IO BufferObject
-newBufferObject = newBufferObjectClobbering GL_ARRAY_BUFFER
+newBufferObject = newBufferObjectNonClobbering GL_ARRAY_BUFFER
 
-newBufferObjectClobbering :: forall a b . Storable a => GLenum -> Vector a -> UsageHint -> IO BufferObject
-newBufferObjectClobbering target src usage = do
+newBufferObjectNonClobbering :: forall a . Storable a => GLenum -> Vector a -> UsageHint -> IO BufferObject
+newBufferObjectNonClobbering target src usage = do
+  orig <- getArrayBufferBinding
   n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
   glBindBuffer target n
   let (fptr, off, len) = V.unsafeToForeignPtr src
@@ -93,7 +93,13 @@ newBufferObjectClobbering target src usage = do
     (fromIntegral (len * size))
     (castPtr (ptr `plusPtr` off))
     (toGL usage)
+  glBindBuffer target (fromIntegral orig)
   return (BufferObject n)
+
+getArrayBufferBinding :: IO GLint
+getArrayBufferBinding = alloca $ \ptr -> do
+  glGetIntegerv GL_ARRAY_BUFFER_BINDING ptr
+  peek ptr
 
 -- | Modify the data in the currently bound VBO starting from the specified
 -- index in bytes.

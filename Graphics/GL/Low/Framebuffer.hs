@@ -110,6 +110,7 @@ attachRBO rbo =
 -- | Create a new renderbuffer with the specified dimensions.
 newRBO :: Int -> Int -> ImageFormat -> IO RBO
 newRBO w h format = do
+  orig <- getRenderbufferBinding
   n <- alloca (\ptr -> glGenRenderbuffers 1 ptr >> peek ptr)
   glBindRenderbuffer GL_RENDERBUFFER n
   glRenderbufferStorage
@@ -117,7 +118,13 @@ newRBO w h format = do
     (toGL format)
     (fromIntegral w)
     (fromIntegral h)
+  glBindRenderbuffer GL_RENDERBUFFER (fromIntegral orig)
   return (RBO n format)
+
+getRenderbufferBinding :: IO GLint
+getRenderbufferBinding = alloca $ \ptr -> do
+  glGetIntegerv GL_RENDERBUFFER_BINDING ptr
+  peek ptr
 
 -- | Delete an RBO.
 deleteRBO :: RBO -> IO ()

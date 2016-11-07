@@ -55,15 +55,25 @@ import Graphics.GL.Low.Cube
 import Graphics.GL.Low.Common
 
 
+getTex2DBinding :: IO GLint
+getTex2DBinding = alloca $ \ptr -> do
+  glGetIntegerv GL_TEXTURE_BINDING_2D ptr
+  peek ptr
+
+getCubemapBinding :: IO GLint
+getCubemapBinding = alloca $ \ptr -> do
+  glGetIntegerv GL_TEXTURE_BINDING_CUBE_MAP ptr
+  peek ptr
+
 -- | Create a new 2D texture from raw image data, its dimensions, and the
--- assumed image format. This operation clobbers the tex 2D binding
--- target. The dimensions should be powers of 2.
+-- assumed image format. The dimensions should be powers of 2.
 newTexture2D :: Storable a
              => Vector a
              -> (Int,Int)
              -> ImageFormat
              -> IO Texture
 newTexture2D src (w,h) format = do
+  orig <- getTex2DBinding
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_2D n
   unsafeWith src $ \ptr -> glTexImage2D
@@ -77,19 +87,22 @@ newTexture2D src (w,h) format = do
     GL_UNSIGNED_BYTE
     (castPtr ptr)
   glGenerateMipmap GL_TEXTURE_2D
+  glBindTexture GL_TEXTURE_2D (fromIntegral orig)
   return (Texture n format)
 
--- | Create a new cubemap texture from six raw data sources. This operation
--- clobbers the cubemap binding target.
+-- | Create a new cubemap texture from six raw data sources. Each side will have
+-- the same format.
 newCubeMap :: Storable a
            => Cube (Vector a, (Int,Int))
            -> ImageFormat
            -> IO Texture
 newCubeMap images format = do
+  orig <- getCubemapBinding
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_CUBE_MAP n
   sequence_ (liftA2 (loadCubeMapSide format) images cubeSideCodes)
   glGenerateMipmap GL_TEXTURE_CUBE_MAP
+  glBindTexture GL_TEXTURE_CUBE_MAP (fromIntegral orig)
   return (Texture n format)
   
 loadCubeMapSide :: Storable a => ImageFormat -> (Vector a, (Int,Int)) -> GLenum -> IO ()
@@ -106,21 +119,23 @@ loadCubeMapSide format (src, (w,h)) side =
     (castPtr ptr)
 
 -- | Create an empty texture with the specified dimensions and format.
--- This clobbers the tex 2D binding target.
 newEmptyTexture2D :: Int -> Int -> ImageFormat -> IO Texture
 newEmptyTexture2D w h format = do
+  orig <- getTex2DBinding
   let w' = fromIntegral w
   let h' = fromIntegral h
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
   glBindTexture GL_TEXTURE_2D n
   glTexImage2D GL_TEXTURE_2D 0 (toGL format) w' h' 0 (toGL format) GL_UNSIGNED_BYTE nullPtr
+  glBindTexture GL_TEXTURE_2D (fromIntegral orig)
   return (Texture n format)
 
 -- | Create a cubemap texture where each of the six sides has the specified
--- dimensions and format. This clobbers the cubemap binding
+-- dimensions and format. 
 -- target.
 newEmptyCubeMap :: Int -> Int -> ImageFormat -> IO Texture
 newEmptyCubeMap w h format = do
+  orig <- getCubemapBinding
   let w' = fromIntegral w
   let h' = fromIntegral h
   n <- alloca (\ptr -> glGenTextures 1 ptr >> peek ptr)
@@ -133,6 +148,7 @@ newEmptyCubeMap w h format = do
   glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Y 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
   glTexImage2D GL_TEXTURE_CUBE_MAP_POSITIVE_Z 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
   glTexImage2D GL_TEXTURE_CUBE_MAP_NEGATIVE_Z 0 fmt w' h' 0 fmt' GL_UNSIGNED_BYTE nullPtr
+  glBindTexture GL_TEXTURE_CUBE_MAP (fromIntegral orig)
   return (Texture n format)
   
 -- | Delete a texture.
