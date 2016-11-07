@@ -9,14 +9,12 @@ module Graphics.GL.Low.VertexAttrib (
 --   , Attrib "shininess" 1 GLFloat   -- next 4 bytes maps to:   in float shininess;
 --   , Attrib "texcoord"  2 GLFloat   -- next 8 bytes maps to:   in vec2 texcoord;
 --   , Unused 2                       -- next 2 bytes ignored
---   , Attrib "seed"      1 GLShort ] -- next 2 bytes read as 16-bit signed int
---                                    --   and mapped to: in float seed;
+--   , Attrib "seed"      1 GLShort ] -- next 2 bytes maps to:   in float seed; bytes are treated as 16-bit signed int
+--
 -- @
 --
--- In this example four mappings from a hypothetical VBO to the variables in
--- the current Program will be established in the current VAO. Then, to use the
--- shader program for rendering (with this VAO bound) you must first bind a
--- compatible VBO.
+-- In this example four mappings are established between the current shader
+-- and the current VBO. The information is stored in the current VAO.
 
   setVertexLayout,
   LayoutElement(..),

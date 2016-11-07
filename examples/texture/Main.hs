@@ -1,7 +1,6 @@
 module Main where
 
 import Control.Monad.Loops (whileM_)
-import Data.Functor ((<$>))
 import qualified Data.Vector.Storable as V
 import Codec.Picture
 import Data.Word

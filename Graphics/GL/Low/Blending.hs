@@ -138,7 +138,6 @@ noBlending = Blending
 -- module Main where
 -- 
 -- import Control.Monad.Loops (whileM_)
--- import Data.Functor ((\<$\>))
 -- import qualified Data.Vector.Storable as V
 -- import Control.Concurrent.STM
 -- 
@@ -178,7 +177,7 @@ noBlending = Blending
 --         [ -0.5,  0.5
 --         ,  0.5,    0
 --         , -0.5, -0.5 ] :: V.Vector Float
---   vbo <- newVBO blob StaticDraw
+--   vbo <- newBufferObject blob StaticDraw
 --   bindVBO vbo
 --   setVertexLayout [Attrib "position" 2 GLFloat]
 --   enableBlending basicBlending

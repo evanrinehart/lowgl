@@ -232,7 +232,6 @@ instance ToGL Wrapping where
 -- module Main where
 -- 
 -- import Control.Monad.Loops (whileM_)
--- import Data.Functor ((\<$\>))
 -- import qualified Data.Vector.Storable as V
 -- import Codec.Picture
 -- import Data.Word
@@ -274,7 +273,7 @@ instance ToGL Wrapping where
 --         , -0.5,  0.5, 0, 0
 --         ,  0.5, -0.5, 1, 1
 --         ,  0.5,  0.5, 1, 0 ] :: V.Vector Float
---   vbo <- newVBO blob StaticDraw
+--   vbo <- newBufferObject blob StaticDraw
 --   bindVBO vbo
 --   setVertexLayout [ Attrib "position" 2 GLFloat
 --                   , Attrib "texcoord" 2 GLFloat ]

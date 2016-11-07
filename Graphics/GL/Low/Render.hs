@@ -6,7 +6,7 @@ module Graphics.GL.Low.Render (
   -- the current shader program. The integer argument is the number of
   -- vertices to read from the VBOs via the current VAO.
   --
-  -- So VAO, VBO, Program, and FBO (or default framebuffer) must already be
+  -- So VAO, Program, and FBO (or default framebuffer) must already be
   -- setup to render these primitives.
   --
   drawPoints,
@@ -23,7 +23,7 @@ module Graphics.GL.Low.Render (
   -- order specified in the current element array. The format argument indicates
   -- the size of each index in the element array.
   --
-  -- So to render primitives this way, you need the VAO, VBO, Program, FBO,
+  -- So to render primitives this way, you need the VAO, Program, FBO,
   -- and the element array already setup.
   --
   drawIndexedPoints,
