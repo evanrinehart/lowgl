@@ -216,7 +216,6 @@ setUniform glAction name xs = withArrayLen xs $ \n bytes -> do
 -- module Main where
 -- 
 -- import Control.Monad.Loops (whileM_)
--- import Data.Functor ((\<$\>))
 -- import qualified Data.Vector.Storable as V
 -- import Data.Maybe (fromJust)
 -- 
@@ -258,7 +257,7 @@ setUniform glAction name xs = withArrayLen xs $ \n bytes -> do
 --         [ -0.4, -0.4, 0, 0
 --         ,  0,    0.4, 0, 1
 --         ,  0.4, -0.4, 1, 1] :: V.Vector Float
---   vbo <- newVBO blob StaticDraw
+--   vbo <- newBufferObject blob StaticDraw
 --   bindVBO vbo
 --   setVertexLayout
 --     [ Attrib "position" 2 GLFloat
