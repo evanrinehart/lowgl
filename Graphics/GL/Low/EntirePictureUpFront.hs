@@ -189,7 +189,6 @@ module Graphics.GL.Low.EntirePictureUpFront (
   -- module Main where
   --
   -- import Control.Monad.Loops (whileM_)
-  -- import Data.Functor ((\<$\>))
   -- import qualified Data.Vector.Storable as V
   -- 
   -- import qualified Graphics.UI.GLFW as GLFW
@@ -228,7 +227,7 @@ module Graphics.GL.Low.EntirePictureUpFront (
   --         [ -0.5, -0.5
   --         ,    0,  0.5
   --         ,  0.5, -0.5 ] :: V.Vector Float
-  --   vbo <- newVBO blob StaticDraw
+  --   vbo <- newBufferObject blob StaticDraw
   --   bindVBO vbo
   --   -- connect program to vertex data via the VAO
   --   setVertexLayout [Attrib "position" 2 GLFloat]
