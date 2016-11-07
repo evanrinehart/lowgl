@@ -73,11 +73,9 @@ library
   
   -- Other library packages from which modules are imported.
   build-depends:       base >=4.7 && <=4.9, 
-                       transformers >= 0.4 && < 0.5,
                        vector >=0.10 && <0.11, 
                        linear >= 1.16 && <1.21, 
-                       gl >=0.5 && <0.8, 
-                       data-default
+                       gl >=0.5 && <0.8
   
   -- Directories containing source files.
   -- hs-source-dirs:      
