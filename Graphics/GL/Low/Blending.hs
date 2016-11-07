@@ -24,39 +24,9 @@ module Graphics.GL.Low.Blending (
   -- $example
 ) where
 
-import Control.Monad.IO.Class
-import Data.Default
 import Graphics.GL
 
 import Graphics.GL.Low.Classes
-
--- | Enable blending with the specified blending parameters.
-enableBlending :: (MonadIO m) => Blending -> m ()
-enableBlending (Blending s d f (r,g,b,a)) = do
-  glBlendFunc (toGL s) (toGL d)
-  glBlendEquation (toGL f)
-  let c = realToFrac
-  glBlendColor (c r) (c g) (c b) (c a)
-  glEnable GL_BLEND
-
--- | Disable alpha blending.
-disableBlending :: (MonadIO m) => m ()
-disableBlending = glDisable GL_BLEND
-
--- | This blending configuration is suitable for ordinary alpha blending
--- transparency effects.
---
--- @
--- Blending
---   { sFactor   = BlendSourceAlpha
---   , dFactor   = BlendOneMinusSourceAlpha
---   , blendFunc = FuncAdd }
--- @
-basicBlending :: Blending
-basicBlending = def
-  { sFactor = BlendSourceAlpha
-  , dFactor = BlendOneMinusSourceAlpha }
-
 
 -- | Blending parameters.
 data Blending = Blending
@@ -65,15 +35,6 @@ data Blending = Blending
   , blendFunc :: BlendEquation
   , blendColor :: (Float,Float,Float,Float) }
 
--- | The default blending parameters have no effect if enabled. The result
--- will be no blending effect.
-instance Default Blending where
-  def = Blending
-    { sFactor = BlendOne
-    , dFactor = BlendZero
-    , blendFunc = FuncAdd
-    , blendColor = (0,0,0,0) }
-
 -- | Blending functions.
 data BlendEquation =
   FuncAdd | -- ^ the default
@@ -81,14 +42,10 @@ data BlendEquation =
   FuncReverseSubtract
     deriving (Eq, Ord, Show, Read)
 
-instance Default BlendEquation where
-  def = FuncAdd
-
 instance ToGL BlendEquation where
   toGL FuncAdd = GL_FUNC_ADD
   toGL FuncSubtract = GL_FUNC_SUBTRACT
   toGL FuncReverseSubtract = GL_FUNC_REVERSE_SUBTRACT
-
 
 -- | Blending factors.
 data BlendFactor =
@@ -106,7 +63,7 @@ data BlendFactor =
   BlendOneMinusConstantColor |
   BlendConstantAlpha |
   BlendOneMinusConstantAlpha
-    deriving Show
+    deriving (Show, Read, Eq, Ord)
 
 instance ToGL BlendFactor where
   toGL BlendOne = GL_ONE
@@ -123,6 +80,44 @@ instance ToGL BlendFactor where
   toGL BlendOneMinusConstantColor = GL_ONE_MINUS_CONSTANT_COLOR
   toGL BlendConstantAlpha = GL_CONSTANT_ALPHA
   toGL BlendOneMinusConstantAlpha = GL_ONE_MINUS_CONSTANT_ALPHA
+
+
+-- | Enable blending with the specified blending parameters.
+enableBlending :: Blending -> IO ()
+enableBlending (Blending s d f (r,g,b,a)) = do
+  glBlendFunc (toGL s) (toGL d)
+  glBlendEquation (toGL f)
+  let c = realToFrac
+  glBlendColor (c r) (c g) (c b) (c a)
+  glEnable GL_BLEND
+
+-- | Disable alpha blending.
+disableBlending :: IO ()
+disableBlending = glDisable GL_BLEND
+
+-- | This blending configuration is suitable for ordinary alpha blending
+-- transparency effects.
+--
+-- @
+-- Blending
+--   { sFactor   = BlendSourceAlpha
+--   , dFactor   = BlendOneMinusSourceAlpha
+--   , blendFunc = FuncAdd }
+-- @
+basicBlending :: Blending
+basicBlending = Blending
+  { sFactor = BlendSourceAlpha
+  , dFactor = BlendOneMinusSourceAlpha
+  , blendFunc = FuncAdd
+  , blendColor = (0,0,0,0) }
+
+-- | Configuration for no blending. @Blending BlendOne BlendZero FuncAdd (0,0,0,0)@
+noBlending :: Blending
+noBlending = Blending
+  { sFactor = BlendOne
+  , dFactor = BlendZero
+  , blendFunc = FuncAdd
+  , blendColor = (0,0,0,0) }
 
 
 -- $example

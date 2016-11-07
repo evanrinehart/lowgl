@@ -47,7 +47,6 @@ module Graphics.GL.Low.Render (
 import Foreign.Ptr
 import Foreign.Marshal
 import Foreign.Storable
-import Control.Monad.IO.Class
 
 import Graphics.GL
 
@@ -86,71 +85,70 @@ instance ToGL IndexFormat where
   toGL UIntIndices   = GL_UNSIGNED_INT
 
 
-
-drawPoints :: (MonadIO m) => Int -> m ()
+drawPoints :: Int -> IO ()
 drawPoints = drawArrays GL_POINTS
 
-drawLines :: (MonadIO m) => Int -> m ()
+drawLines :: Int -> IO ()
 drawLines = drawArrays GL_LINES
 
-drawLineStrip :: (MonadIO m) => Int -> m ()
+drawLineStrip :: Int -> IO ()
 drawLineStrip = drawArrays GL_LINE_STRIP
 
-drawLineLoop :: (MonadIO m) => Int -> m ()
+drawLineLoop :: Int -> IO ()
 drawLineLoop = drawArrays GL_LINE_LOOP
 
-drawTriangles :: (MonadIO m) => Int -> m ()
+drawTriangles :: Int -> IO ()
 drawTriangles = drawArrays GL_TRIANGLES
 
-drawTriangleStrip :: (MonadIO m) => Int -> m ()
+drawTriangleStrip :: Int -> IO ()
 drawTriangleStrip = drawArrays GL_TRIANGLE_STRIP
 
-drawTriangleFan :: (MonadIO m) => Int -> m ()
+drawTriangleFan :: Int -> IO ()
 drawTriangleFan = drawArrays GL_TRIANGLE_FAN
 
-drawArrays :: (MonadIO m) => GLenum -> Int -> m ()
+drawArrays :: GLenum -> Int -> IO ()
 drawArrays mode n = glDrawArrays mode 0 (fromIntegral n)
 
-drawIndexedPoints :: (MonadIO m) => Int -> IndexFormat -> m ()
+drawIndexedPoints :: Int -> IndexFormat -> IO ()
 drawIndexedPoints = drawIndexed GL_POINTS
 
-drawIndexedLines :: (MonadIO m) => Int -> IndexFormat -> m ()
+drawIndexedLines :: Int -> IndexFormat -> IO ()
 drawIndexedLines = drawIndexed GL_LINES
 
-drawIndexedLineStrip :: (MonadIO m) => Int -> IndexFormat -> m ()
+drawIndexedLineStrip :: Int -> IndexFormat -> IO ()
 drawIndexedLineStrip = drawIndexed GL_LINE_STRIP
 
-drawIndexedLineLoop :: (MonadIO m) => Int -> IndexFormat -> m ()
+drawIndexedLineLoop :: Int -> IndexFormat -> IO ()
 drawIndexedLineLoop = drawIndexed GL_LINE_LOOP
 
-drawIndexedTriangles :: (MonadIO m) => Int -> IndexFormat -> m ()
+drawIndexedTriangles :: Int -> IndexFormat -> IO ()
 drawIndexedTriangles = drawIndexed GL_TRIANGLES
 
-drawIndexedTriangleStrip :: (MonadIO m) => Int -> IndexFormat -> m ()
+drawIndexedTriangleStrip :: Int -> IndexFormat -> IO ()
 drawIndexedTriangleStrip = drawIndexed GL_TRIANGLE_STRIP
 
-drawIndexedTriangleFan :: (MonadIO m) => Int -> IndexFormat -> m ()
+drawIndexedTriangleFan :: Int -> IndexFormat -> IO ()
 drawIndexedTriangleFan = drawIndexed GL_TRIANGLE_FAN
 
-drawIndexed :: (MonadIO m) => GLenum -> Int -> IndexFormat -> m ()
+drawIndexed :: GLenum -> Int -> IndexFormat -> IO ()
 drawIndexed mode n fmt = glDrawElements mode (fromIntegral n) (toGL fmt) nullPtr
 
 -- | Enable the scissor test. Graphics outside the scissor box will not be
 -- rendered.
-enableScissorTest :: (MonadIO m) => Viewport -> m ()
+enableScissorTest :: Viewport -> IO ()
 enableScissorTest (Viewport x y w h) = do
   glScissor (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
   glEnable GL_SCISSOR_TEST
 
 -- | Disable the scissor test.
-disableScissorTest :: (MonadIO m) => m ()
+disableScissorTest :: IO ()
 disableScissorTest = glDisable GL_SCISSOR_TEST
 
 
 -- | Enable facet culling. The argument specifies whether front faces, back
 -- faces, or both will be omitted from rendering. If both front and back
 -- faces are culled you can still render points and lines.
-enableCulling :: (MonadIO m) => Culling -> m ()
+enableCulling :: Culling -> IO ()
 enableCulling c = do
   case c of
     CullFront -> glCullFace GL_FRONT
@@ -159,10 +157,10 @@ enableCulling c = do
   glEnable GL_CULL_FACE
 
 -- | Disable facet culling. Front and back faces will now be rendered.
-disableCulling :: (MonadIO m) => m ()
+disableCulling :: IO ()
 disableCulling = glDisable GL_CULL_FACE
 
 -- | Set the viewport. The default viewport simply covers the entire window.
-setViewport :: (MonadIO m) => Viewport -> m ()
+setViewport :: Viewport -> IO ()
 setViewport (Viewport x y w h) =
   glViewport (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)

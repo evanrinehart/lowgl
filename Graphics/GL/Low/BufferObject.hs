@@ -11,14 +11,14 @@ module Graphics.GL.Low.BufferObject (
 -- vertex shader interprets the data for each vertex by mapping the attributes
 -- of the vertex (position, normal vector, etc) to input variables using the
 -- VAO. VBOs have the data which is used as input to the vertex shader
--- according to the configuration of the VAO/.
+-- according to the configuration of the VAO.
 --
 -- Example VBO contents:
 --
 -- <<vbo.png VBO diagram>>
 --
 -- The shader will interpret those parts of the VBO as illustrated only after
--- appropiately configuring a VAO. See "Graphics.GL.Low.VAO".
+-- appropriately configuring a VAO. See "Graphics.GL.Low.VAO".
 
 -- * ElementArray
 
@@ -29,7 +29,7 @@ module Graphics.GL.Low.BufferObject (
 -- accepts element array objects whose indices are encoded as unsigned bytes,
 -- unsigned 16-bit ints, and unsigned 32-bit ints.
 --
--- Example ElementArray contents appropriate for render triangles and lines
+-- Example ElementArray contents appropriate for rendering triangles and lines
 -- respectively:
 --
 -- <<element_array.png Element array diagram>>
@@ -42,15 +42,13 @@ module Graphics.GL.Low.BufferObject (
 
 -- * Documentation
 
-  newVBO,
-  updateVBO,
-  bindVBO,
-  newElementArray,
-  updateElementArray,
-  bindElementArray,
+  newBufferObject,
   deleteBufferObject,
-  VBO,
-  ElementArray,
+  bindVBO,
+  updateVBO,
+  bindElementArray,
+  updateElementArray,
+  BufferObject,
   UsageHint(..)
 ) where
 
@@ -61,11 +59,10 @@ import Foreign.Storable
 import qualified Data.Vector.Storable as V
 import Data.Vector.Storable (Vector)
 import Data.Word
-import Control.Monad.IO.Class
 
 import Graphics.GL
 
-import Graphics.GL.Low.Internal.Types
+import Graphics.GL.Low.Types
 import Graphics.GL.Low.Classes
 
 
@@ -80,66 +77,55 @@ instance ToGL UsageHint where
   toGL DynamicDraw = GL_DYNAMIC_DRAW
   toGL StreamDraw  = GL_STREAM_DRAW
 
+-- | Use this to create VBOs or element arrays from raw data.
+-- This operation clobbers the array buffer binding target.
+newBufferObject :: Storable a => Vector a -> UsageHint -> IO BufferObject
+newBufferObject = newBufferObjectClobbering GL_ARRAY_BUFFER
 
-
--- | Create a buffer object from a blob of bytes. The usage argument hints
--- at how often you will modify the data.
-newVBO :: (MonadIO m, Storable a) => Vector a -> UsageHint -> m VBO
-newVBO = newBufferObject VBO GL_ARRAY_BUFFER
-
--- | Delete a VBO or ElementArray.
-deleteBufferObject :: (MonadIO m, BufferObject a) => a -> m ()
-deleteBufferObject bo = liftIO $ withArray [glObjectName bo] (\ptr -> glDeleteBuffers 1 ptr)
-
--- | Modify the data in the currently bound VBO starting from the specified
--- index in bytes.
-updateVBO :: (MonadIO m, Storable a) => Vector a -> Int -> m ()
-updateVBO = updateBufferObject GL_ARRAY_BUFFER
-
--- | Bind a VBO to the array buffer binding target. The buffer object bound
--- there will be replaced, if any.
-bindVBO :: (MonadIO m) => VBO -> m ()
-bindVBO (VBO n) = glBindBuffer GL_ARRAY_BUFFER n
-
-
--- | Create a new ElementArray buffer object from the blob of packed indices.
--- The usage argument hints at how often you plan to modify the data.
-newElementArray :: (MonadIO m, Storable a) => Vector a -> UsageHint -> m ElementArray
-newElementArray = newBufferObject ElementArray GL_ELEMENT_ARRAY_BUFFER
-
--- | Modify contents in the currently bound ElementArray starting at the
--- specified index in bytes.
-updateElementArray :: (MonadIO m, Storable a) => Vector a -> Int -> m ()
-updateElementArray = updateBufferObject GL_ELEMENT_ARRAY_BUFFER
-
--- | Assign an ElementArray to the element array binding target. It will
--- replace the ElementArray already bound there, if any. Note that the state
--- of the element array binding target is a function of the current VAO.
-bindElementArray :: (MonadIO m) => ElementArray -> m ()
-bindElementArray (ElementArray n) = glBindBuffer GL_ELEMENT_ARRAY_BUFFER n
-
-
-newBufferObject :: forall m a b. (MonadIO m, Storable a) => (GLuint -> b) -> GLenum -> Vector a -> UsageHint -> m b
-newBufferObject ctor target src usage = do
-  n <- liftIO $ alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
+newBufferObjectClobbering :: forall a b . Storable a => GLenum -> Vector a -> UsageHint -> IO BufferObject
+newBufferObjectClobbering target src usage = do
+  n <- alloca (\ptr -> glGenBuffers 1 ptr >> peek ptr)
   glBindBuffer target n
   let (fptr, off, len) = V.unsafeToForeignPtr src
   let size = sizeOf (undefined :: a)
-  liftIO . withForeignPtr fptr $ \ptr -> glBufferData
+  withForeignPtr fptr $ \ptr -> glBufferData
     target
     (fromIntegral (len * size))
     (castPtr (ptr `plusPtr` off))
     (toGL usage)
-  return (ctor n)
+  return (BufferObject n)
 
-updateBufferObject :: forall m a. (MonadIO m, Storable a) => GLenum -> Vector a -> Int -> m ()
-updateBufferObject target bytes offset = do
-  let (fptr, off, len) = V.unsafeToForeignPtr bytes
+-- | Modify the data in the currently bound VBO starting from the specified
+-- index in bytes.
+updateVBO :: Storable a => Vector a -> Int -> IO ()
+updateVBO = updateBufferObject GL_ARRAY_BUFFER
+
+-- | Modify contents in the currently bound element array starting at the
+-- specified index in bytes.
+updateElementArray :: Storable a => Vector a -> Int -> IO ()
+updateElementArray = updateBufferObject GL_ELEMENT_ARRAY_BUFFER
+
+updateBufferObject :: forall a . Storable a => GLenum -> Vector a -> Int -> IO ()
+updateBufferObject target src offset = do
+  let (fptr, off, len) = V.unsafeToForeignPtr src
   let size = sizeOf (undefined :: a)
-  liftIO . withForeignPtr fptr $ \ptr -> glBufferSubData
+  withForeignPtr fptr $ \ptr -> glBufferSubData
     target
     (fromIntegral offset)
     (fromIntegral (len * size))
     (castPtr (ptr `plusPtr` off))
 
+-- | Delete a buffer object.
+deleteBufferObject :: BufferObject -> IO ()
+deleteBufferObject bo = withArray [fromBufferObject bo] (\ptr -> glDeleteBuffers 1 ptr)
 
+-- | Bind a VBO to the array buffer binding target. The buffer object bound
+-- there will be replaced, if any.
+bindVBO :: BufferObject -> IO ()
+bindVBO = glBindBuffer GL_ARRAY_BUFFER . fromBufferObject
+
+-- | Assign an element array to the element array binding target. It will
+-- replace the buffer object already bound there, if any. The binding will
+-- be remembered in the currently bound VAO.
+bindElementArray :: BufferObject -> IO ()
+bindElementArray = glBindBuffer GL_ELEMENT_ARRAY_BUFFER . fromBufferObject

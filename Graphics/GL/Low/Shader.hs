@@ -60,12 +60,11 @@ import Foreign.Storable
 import Control.Exception
 import Control.Monad (when, forM_)
 import Data.Typeable
-import Control.Monad.IO.Class
 
 import Graphics.GL
 import Linear
 
-import Graphics.GL.Low.Internal.Types
+import Graphics.GL.Low.Types
 import Graphics.GL.Low.Classes
 import Graphics.GL.Low.VertexAttrib
 
@@ -89,21 +88,20 @@ data ProgramError =
 instance Exception ProgramError
 
 -- | Same as 'newProgram' but does not throw exceptions.
-newProgramSafe :: (MonadIO m) => String -> String -> m (Either ProgramError Program)
-newProgramSafe vcode fcode = liftIO . try $ newProgram vcode fcode
+newProgramSafe :: String -> String -> IO (Either ProgramError Program)
+newProgramSafe vcode fcode = try $ newProgram vcode fcode
 
 -- | Delete a program.
-deleteProgram :: (MonadIO m) => Program -> m ()
+deleteProgram :: Program -> IO ()
 deleteProgram (Program n) = glDeleteProgram n
 
 -- | Compile the code for a vertex shader and a fragment shader, then link
 -- them into a new program. If the compiler or linker fails it will throw
 -- a ProgramError.
-newProgram :: (MonadIO m) 
-           => String -- ^ vertex shader source code
+newProgram :: String -- ^ vertex shader source code
            -> String -- ^ fragment shader source code
-           -> m Program
-newProgram vcode fcode = liftIO $ do
+           -> IO Program
+newProgram vcode fcode = do
   vertexShaderId <- compileShader vcode VertexShader
   fragmentShaderId <- compileShader fcode FragmentShader
   programId <- glCreateProgram
@@ -125,11 +123,11 @@ newProgram vcode fcode = liftIO $ do
 
 -- | Install a program into the rendering pipeline. Replaces the program
 -- already in use, if any.
-useProgram :: (MonadIO m) => Program -> m ()
-useProgram (Program n) = glUseProgram n
+useProgram :: Program -> IO ()
+useProgram = glUseProgram . fromProgram
 
-compileShader :: (MonadIO m) => String -> ShaderType -> m GLuint
-compileShader code vertOrFrag = liftIO $ do
+compileShader :: String -> ShaderType -> IO GLuint
+compileShader code vertOrFrag = do
   shaderId <- glCreateShader (toGL vertOrFrag)
   withCString code $ \ptr -> with ptr $ \pptr -> do
     glShaderSource shaderId 1 pptr nullPtr
@@ -147,55 +145,55 @@ compileShader code vertOrFrag = liftIO $ do
       FragmentShader -> throwIO (FragmentShaderError errors)
   return shaderId
 
-setUniform1f :: (MonadIO m) => String -> [Float] -> m ()
+setUniform1f :: String -> [Float] -> IO ()
 setUniform1f = setUniform glUniform1fv
 
-setUniform2f :: (MonadIO m) => String -> [V2 Float] -> m ()
+setUniform2f :: String -> [V2 Float] -> IO ()
 setUniform2f = setUniform
   (\loc cnt val -> glUniform2fv loc cnt (castPtr val))
 
-setUniform3f :: (MonadIO m) => String -> [V3 Float] -> m ()
+setUniform3f :: String -> [V3 Float] -> IO ()
 setUniform3f = setUniform
   (\loc cnt val -> glUniform3fv loc cnt (castPtr val))
 
-setUniform4f :: (MonadIO m) => String -> [V4 Float] -> m ()
+setUniform4f :: String -> [V4 Float] -> IO ()
 setUniform4f = setUniform
   (\loc cnt val -> glUniform4fv loc cnt (castPtr val))
 
-setUniform1i :: (MonadIO m) => String -> [Int] -> m ()
+setUniform1i :: String -> [Int] -> IO ()
 setUniform1i = setUniform
   (\loc cnt val -> glUniform1iv loc cnt (castPtr val))
 
-setUniform2i :: (MonadIO m) => String -> [V2 Int] -> m ()
+setUniform2i :: String -> [V2 Int] -> IO ()
 setUniform2i = setUniform 
   (\loc cnt val -> glUniform2iv loc cnt (castPtr val))
 
-setUniform3i :: (MonadIO m) => String -> [V3 Int] -> m ()
+setUniform3i :: String -> [V3 Int] -> IO ()
 setUniform3i = setUniform
   (\loc cnt val -> glUniform3iv loc cnt (castPtr val))
 
-setUniform4i :: (MonadIO m) => String -> [V4 Int] -> m ()
+setUniform4i :: String -> [V4 Int] -> IO ()
 setUniform4i = setUniform
   (\loc cnt val -> glUniform4iv loc cnt (castPtr val))
 
-setUniform44 :: (MonadIO m) => String -> [M44 Float] -> m ()
+setUniform44 :: String -> [M44 Float] -> IO ()
 setUniform44 = setUniform
   (\loc cnt val -> glUniformMatrix4fv loc cnt GL_FALSE (castPtr val))
 
-setUniform33 :: (MonadIO m) => String -> [M33 Float] -> m ()
+setUniform33 :: String -> [M33 Float] -> IO ()
 setUniform33 = setUniform
   (\loc cnt val -> glUniformMatrix3fv loc cnt GL_FALSE (castPtr val))
 
-setUniform22 :: (MonadIO m) => String -> [M22 Float] -> m ()
+setUniform22 :: String -> [M22 Float] -> IO ()
 setUniform22 = setUniform
   (\loc cnt val -> glUniformMatrix2fv loc cnt GL_FALSE (castPtr val))
 
-setUniform :: (MonadIO m, Storable a)
+setUniform :: Storable a
            => (GLint -> GLsizei -> Ptr a -> IO ())
            -> String
            -> [a]
-           -> m ()
-setUniform glAction name xs = liftIO . withArrayLen xs $ \n bytes -> do
+           -> IO ()
+setUniform glAction name xs = withArrayLen xs $ \n bytes -> do
   p <- alloca (\ptr -> glGetIntegerv GL_CURRENT_PROGRAM ptr >> peek ptr)
   if p == 0
     then return ()

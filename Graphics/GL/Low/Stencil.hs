@@ -31,24 +31,23 @@ module Graphics.GL.Low.Stencil (
 import Data.Default
 import Data.Bits
 import Data.Word
-import Control.Monad.IO.Class
 
 import Graphics.GL
 import Graphics.GL.Low.Classes
 
 -- | Enable the stencil test with a set of operating parameters.
-enableStencil :: (MonadIO m) => Stencil -> m ()
+enableStencil :: Stencil -> IO ()
 enableStencil (Stencil f r m op1 op2 op3) = do
   glStencilFunc (toGL f) (fromIntegral r) (fromIntegral m)
   glStencilOp (toGL op1) (toGL op2) (toGL op3)
   glEnable GL_STENCIL_TEST
 
 -- | Disable the stencil test and updates to the stencil buffer, if one exists.
-disableStencil :: (MonadIO m) => m ()
+disableStencil :: IO ()
 disableStencil = glDisable GL_STENCIL_TEST
 
 -- | Clear the stencil buffer with all zeros.
-clearStencilBuffer :: (MonadIO m) => m ()
+clearStencilBuffer :: IO ()
 clearStencilBuffer = glClear GL_STENCIL_BUFFER_BIT
 
 -- | In this basic configuration of the stencil, anything rendered will

@@ -11,9 +11,9 @@ module Graphics.GL.Low.EntirePictureUpFront (
   -- | Objects may be created and destroyed by client code. They include:
   --
   -- - Vertex Array Object ('Graphics.GL.Low.VAO.VAO')
-  -- - Buffer Objects ('Graphics.GL.Low.BufferObject.VBO', 'Graphics.GL.Low.BufferObject.ElementArray')
-  -- - Textures ('Graphics.GL.Low.Texture.Tex2D', 'Graphics.GL.Low.Texture.CubeMap')
-  -- - Shader 'Graphics.GL.Low.Shader.Program's
+  -- - 'Graphics.GL.Low.BufferObject's
+  -- - 'Graphics.GL.Low.Texture's (either Tex2D or cubemaps)
+  -- - 'Graphics.GL.Low.Shader's
   -- - Framebuffer Objects ('Graphics.GL.Low.Framebuffer.FBO')
   -- - Renderbuffer Objects ('Graphics.GL.Low.Framebuffer.RBO')
 

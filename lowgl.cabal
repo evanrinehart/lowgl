@@ -10,13 +10,13 @@ name:                lowgl
 -- PVP summary:      +-+------- breaking API changes
 --                   | | +----- non-breaking API additions
 --                   | | | +--- code changes with no API change
-version:             0.3.1.2
+version:             0.4.0.0
 
 -- A short (one-line) description of the package.
 synopsis:            Basic gl wrapper and reference
 
 -- A longer description of the package.
-description:         This library exposes a vastly simplified subset of OpenGL that is hopefully still complete enough for many purposes, such as following tutorials, making simple games, and demos.
+description:         This library exposes a simplified subset of OpenGL that I hope is complete enough for following tutorials and making simple games or demos.
 
 -- The license under which the package is released.
 license:             BSD2
@@ -54,19 +54,18 @@ library
                        Graphics.GL.Low.Color
                        Graphics.GL.Low.Classes
                        Graphics.GL.Low.Cube
+                       Graphics.GL.Low.Common
                        Graphics.GL.Low.Depth
                        Graphics.GL.Low.Error
                        Graphics.GL.Low.EntirePictureUpFront
                        Graphics.GL.Low.Framebuffer
-                       Graphics.GL.Low.ImageFormat
                        Graphics.GL.Low.Render
                        Graphics.GL.Low.Shader
                        Graphics.GL.Low.Stencil
                        Graphics.GL.Low.Texture
                        Graphics.GL.Low.VAO
                        Graphics.GL.Low.VertexAttrib
-                       Graphics.GL.Low.Common
-                       Graphics.GL.Low.Internal.Types
+                       Graphics.GL.Low.Types
   
   -- Modules included in this library but not exported.
   -- other-modules:       
@@ -96,4 +95,4 @@ source-repository head
 source-repository this
   type: git
   location: https://github.com/evanrinehart/lowgl
-  tag: 0.3.1.2
+  tag: 0.4.0.0

@@ -19,8 +19,8 @@ module Graphics.GL.Low.VAO (
 -- lookup the position of the input variables and issue the appropriate
 -- glVertexAttribPointer calls.
 --
--- After a VAO is configured against a Program, either can be swapped in or
--- out freely and they will still work when both are swapped in again together.
+-- After a VAO is configured against a Program, either one can be swapped in or
+-- out freely. They will still work when both are swapped back in together.
 --
 -- An "in-use" program will use whatever VAO is bound for getting its vertex
 -- inputs. It is up to the programmer to ensure that the VAO has been
@@ -63,25 +63,24 @@ module Graphics.GL.Low.VAO (
 
 import Foreign.Storable
 import Foreign.Marshal
-import Control.Monad.IO.Class
 
 import Graphics.GL
 
-import Graphics.GL.Low.Internal.Types
+import Graphics.GL.Low.Types
 import Graphics.GL.Low.Classes
 
 -- | Create a new VAO. The only thing you can do with a VAO is bind it to
 -- the vertex array binding target.
-newVAO :: (MonadIO m) => m VAO
-newVAO = liftIO $ do
+newVAO :: IO VAO
+newVAO = do
   n <- alloca (\ptr -> glGenVertexArrays 1 ptr >> peek ptr)
   return (VAO n)
 
 -- | Delete a VAO.
-deleteVAO :: (MonadIO m) => VAO -> m ()
-deleteVAO (VAO n) = liftIO $ withArray [n] (\ptr -> glDeleteVertexArrays 1 ptr)
+deleteVAO :: VAO -> IO ()
+deleteVAO (VAO n) = withArray [n] (\ptr -> glDeleteVertexArrays 1 ptr)
 
 -- | Assign the VAO to the vertex array binding target. The VAO already bound
 -- will be replaced, if any.
-bindVAO :: (MonadIO m) => VAO -> m ()
+bindVAO :: VAO -> IO ()
 bindVAO (VAO n) = glBindVertexArray n

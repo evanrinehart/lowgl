@@ -20,10 +20,6 @@ data Cube a = Cube
   , cubeBack   :: a }
     deriving (Show, Functor, Foldable, Traversable)
 
--- | A type to pick one of the sides of a cube. See the accessors of the
--- type 'Cube'.
-type Side = forall a . Cube a -> a
-
 instance Applicative Cube where
   pure x = Cube x x x x x x
   (Cube f1 f2 f3 f4 f5 f6) <*> (Cube x1 x2 x3 x4 x5 x6) =

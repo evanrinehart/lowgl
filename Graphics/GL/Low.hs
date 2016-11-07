@@ -2,25 +2,16 @@
 module Graphics.GL.Low (
 
   -- * Overview
-  -- | OpenGL is a graphics rendering interface. This library exposes a vastly
-  -- simplified subset of OpenGL that is hopefully still complete enough for
-  -- many purposes, such as following tutorials, making simple games, and
-  -- demos. In particular the intention is to concentrate on a subset of
-  -- OpenGL 3.2 (Core Profile) roughly corresponding to ES 2.0.
+  -- | This library exposes a simplified subset of OpenGL that I hope is
+  -- complete enough for following tutorials and making simple games or demos.
   --
-  -- A second primary purpose is to document the complex model behind the
-  -- interface in a way that is more elaborate than tutorials and more concise
-  -- than the spec. As such, this is an experimental project to aid my own
-  -- process of understanding OpenGL. It seems that understanding the entire
-  -- picture up-front is the only way to get started, so this should also serve
-  -- as a quick reference guide to the core commands and concepts.
+  -- For a whirlwind tour of the machinery behind GL see the module:
   -- "Graphics.GL.Low.EntirePictureUpFront"
   --
   -- This library uses the `gl' package for raw bindings to OpenGL and the
   -- `linear' package for matrices.
   --
-  --
-  -- See specific modules for topic-specific docs and example code:
+  -- See submodules for specialized documentation of each subsystem.
   --
   -- @"Graphics.GL.Low.VAO"@
   --
@@ -53,15 +44,13 @@ module Graphics.GL.Low (
 
   -- * Buffer Objects
   -- | See also "Graphics.GL.Low.BufferObject".
-  newVBO,
-  newElementArray,
+  newBufferObject,
   bindVBO,
   bindElementArray,
   updateVBO,
   updateElementArray,
   deleteBufferObject,
-  VBO,
-  ElementArray,
+  BufferObject,
   UsageHint(..),
 
   -- * Shader Program
@@ -93,6 +82,7 @@ module Graphics.GL.Low (
 
   -- * Textures
   -- | See also "Graphics.GL.Low.Texture".
+  Texture,
   newTexture2D,
   newCubeMap,
   newEmptyTexture2D,
@@ -105,11 +95,7 @@ module Graphics.GL.Low (
   setCubeMapFiltering,
   setTex2DWrapping,
   setCubeMapWrapping,
-  Tex2D,
-  CubeMap,
-  Dimensions(..),
   Cube(..),
-  Side,
   Filtering(..),
   Wrapping(..),
 
@@ -174,14 +160,14 @@ module Graphics.GL.Low (
 
   -- * Framebuffers
   -- | See also "Graphics.GL.Low.Framebuffer".
-  DefaultFramebuffer(..),
   FBO,
-  bindFramebuffer,
   newFBO,
+  bindFBO,
+  bindDefaultFramebuffer,
+  deleteFBO,
   attachTex2D,
   attachCubeMap,
   attachRBO,
-  deleteFBO,
 
   -- * Renderbuffers
   RBO,
@@ -194,19 +180,7 @@ module Graphics.GL.Low (
   assertNoGLError,
 
   -- * Image Formats
-  Alpha,
-  Luminance,
-  LuminanceAlpha,
-  RGB,
-  RGBA,
-  Depth24,
-  Depth24Stencil8,
-
-  -- * Classes
-  InternalFormat(..),
-  Framebuffer(..),
-  Texture(..),
-  Attachable(..)
+  ImageFormat(..),
 
 ) where
 
@@ -222,6 +196,5 @@ import Graphics.GL.Low.Color
 import Graphics.GL.Low.Depth
 import Graphics.GL.Low.Stencil
 import Graphics.GL.Low.Render
-import Graphics.GL.Low.ImageFormat
 import Graphics.GL.Low.Cube
 import Graphics.GL.Low.Error

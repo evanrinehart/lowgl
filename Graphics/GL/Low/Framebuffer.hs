@@ -7,16 +7,16 @@ module Graphics.GL.Low.Framebuffer (
 -- techniques. Rendering to a texture (either color, depth, or depth/stencil)
 -- is accomplished by using a framebuffer object (FBO).
 --
--- The following ritual sets up an FBO with a blank 256x256 color texture for
+-- The following code sets up an FBO with a blank 256x256 color texture for
 -- off-screen rendering:
 --
 -- @
 -- do
 --   fbo <- newFBO
---   tex <- newEmptyTexture2D 256 256 :: IO (Tex2D RGB)
+--   tex <- newEmptyTexture2D 256 256 RGB
 --   bindFramebuffer fbo
 --   attachTex2D tex
---   bindFramebuffer DefaultFramebuffer
+--   bindDefaultFramebuffer
 --   return (fbo, tex)
 -- @
 --
@@ -27,7 +27,8 @@ module Graphics.GL.Low.Framebuffer (
 -- a texture to the color attachment point.
 
   newFBO,
-  bindFramebuffer,
+  bindFBO,
+  bindDefaultFramebuffer,
   deleteFBO,
   attachTex2D,
   attachCubeMap,
@@ -35,7 +36,6 @@ module Graphics.GL.Low.Framebuffer (
   newRBO,
   deleteRBO,
   FBO,
-  DefaultFramebuffer(..),
   RBO
 
   -- * Example
@@ -46,86 +46,85 @@ module Graphics.GL.Low.Framebuffer (
 import Foreign.Ptr
 import Foreign.Marshal
 import Foreign.Storable
-import Control.Monad.IO.Class
 
 import Data.Default
 import Graphics.GL
 
-import Graphics.GL.Low.Internal.Types
+import Graphics.GL.Low.Types
 import Graphics.GL.Low.Classes
-import Graphics.GL.Low.Common
 import Graphics.GL.Low.Cube
 import Graphics.GL.Low.Texture
+import Graphics.GL.Low.Common
 
 
--- | The default framebuffer.
-data DefaultFramebuffer = DefaultFramebuffer deriving Show
-
-instance Default DefaultFramebuffer where
-  def = DefaultFramebuffer
-
-instance Framebuffer DefaultFramebuffer where
-  framebufferName _ = 0
-
-
--- | Binds an FBO or the default framebuffer to the framebuffer binding target.
+-- | Binds an FBO to the framebuffer binding target.
 -- Replaces the framebuffer already bound there.
-bindFramebuffer :: (MonadIO m, Framebuffer a) => a -> m ()
-bindFramebuffer x = glBindFramebuffer GL_FRAMEBUFFER (framebufferName x)
+bindFBO :: FBO -> IO ()
+bindFBO = glBindFramebuffer GL_FRAMEBUFFER . fromFBO
+
+-- | Binds the default framebuffer to the framebuffer binding target.
+bindDefaultFramebuffer :: IO ()
+bindDefaultFramebuffer = glBindFramebuffer GL_FRAMEBUFFER 0
 
 -- | Create a new framebuffer object. Before the framebuffer can be used for
 -- rendering it must have a color image attachment.
-newFBO :: (MonadIO m) => m FBO
-newFBO = liftIO . fmap FBO $ alloca (\ptr -> glGenFramebuffers 1 ptr >> peek ptr)
+newFBO :: IO FBO
+newFBO = fmap FBO $ alloca (\ptr -> glGenFramebuffers 1 ptr >> peek ptr)
 
 -- | Delete an FBO.
-deleteFBO :: (MonadIO m) => FBO -> m ()
-deleteFBO (FBO n) = liftIO $ withArray [n] (\ptr -> glDeleteFramebuffers 1 ptr)
+deleteFBO :: FBO -> IO ()
+deleteFBO fbo = withArray [fromFBO fbo] (\ptr -> glDeleteFramebuffers 1 ptr)
 
 -- | Attach a 2D texture to the FBO currently bound to the
 -- framebuffer binding target.
-attachTex2D :: (MonadIO m, Attachable a) => Tex2D a -> m ()
+attachTex2D :: Texture -> IO ()
 attachTex2D tex =
   glFramebufferTexture2D
     GL_FRAMEBUFFER
-    (attachPoint tex)
+    (attachmentPointForImageFormat (texFormat tex))
     GL_TEXTURE_2D
-    (glObjectName tex)
+    (texObjectName tex)
     0
 
 -- | Attach one of the sides of a cubemap texture to the FBO currently bound
 -- to the framebuffer binding target.
-attachCubeMap :: (MonadIO m, Attachable a) => CubeMap a -> Side -> m ()
-attachCubeMap cm side =
+attachCubeMap :: Texture -> (forall a . Cube a -> a) -> IO ()
+attachCubeMap tex side =
   glFramebufferTexture2D
     GL_FRAMEBUFFER
-    (attachPoint cm)
+    (attachmentPointForImageFormat (texFormat tex))
     (side cubeSideCodes)
-    (glObjectName cm)
+    (texObjectName tex)
     0
 
 -- | Attach an RBO to the FBO currently bound to the framebuffer binding
 -- target.
-attachRBO :: (MonadIO m, Attachable a) => RBO a -> m ()
-attachRBO rbo = glFramebufferRenderbuffer
-  GL_FRAMEBUFFER (attachPoint rbo) GL_RENDERBUFFER (unRBO rbo)
+attachRBO :: RBO -> IO ()
+attachRBO rbo =
+  glFramebufferRenderbuffer
+    GL_FRAMEBUFFER
+    (attachmentPointForImageFormat (rboFormat rbo))
+    GL_RENDERBUFFER
+    (rboObjectName rbo)
 
 -- | Create a new renderbuffer with the specified dimensions.
-newRBO :: (MonadIO m, InternalFormat a) => Int -> Int -> m (RBO a)
-newRBO w h = do
-  n <- liftIO $ alloca (\ptr -> glGenRenderbuffers 1 ptr >> peek ptr)
-  rbo <- return (RBO n)
+newRBO :: Int -> Int -> ImageFormat -> IO RBO
+newRBO w h format = do
+  n <- alloca (\ptr -> glGenRenderbuffers 1 ptr >> peek ptr)
   glBindRenderbuffer GL_RENDERBUFFER n
   glRenderbufferStorage
     GL_RENDERBUFFER
-    (internalFormat rbo)
+    (toGL format)
     (fromIntegral w)
     (fromIntegral h)
-  return rbo
+  return (RBO n format)
 
 -- | Delete an RBO.
-deleteRBO :: (MonadIO m) => RBO a -> m ()
-deleteRBO (RBO n) = liftIO $ withArray [n] (\ptr -> glDeleteRenderbuffers 1 ptr)
+deleteRBO :: RBO -> IO ()
+deleteRBO rbo =
+  withArray
+    [rboObjectName rbo]
+    (\ptr -> glDeleteRenderbuffers 1 ptr)
 
 
 -- $example
@@ -209,13 +208,13 @@ deleteRBO (RBO n) = liftIO $ withArray [n] (\ptr -> glDeleteRenderbuffers 1 ptr)
 --   -- create an FBO to render the primary scene on
 --   fbo <- newFBO
 --   bindFramebuffer fbo
---   texture <- newEmptyTexture2D 640 480 :: IO (Tex2D RGB)
+--   texture <- newEmptyTexture2D 640 480 RGB
 --   bindTexture2D texture
 --   setTex2DFiltering Linear
 --   attachTex2D texture
 --   return (vao1, vao2, prog1, prog2, fbo, texture)
 -- 
--- draw :: VAO -> VAO -> Program -> Program -> FBO -> Tex2D RGB -> Float -> IO ()
+-- draw :: VAO -> VAO -> Program -> Program -> FBO -> Texture -> Float -> IO ()
 -- draw vao1 vao2 prog1 prog2 fbo texture t = do
 --   -- render primary scene to fbo
 --   bindVAO vao1
@@ -227,7 +226,7 @@ deleteRBO (RBO n) = liftIO $ withArray [n] (\ptr -> glDeleteRenderbuffers 1 ptr)
 -- 
 --   -- render results to quad on main screen
 --   bindVAO vao2
---   bindFramebuffer DefaultFramebuffer
+--   bindDefaultFramebuffer
 --   useProgram prog2
 --   bindTexture2D texture
 --   clearColorBuffer (0,0,0)
