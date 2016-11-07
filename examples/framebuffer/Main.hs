@@ -1,11 +1,8 @@
-{-# LANGUAGE OverloadedStrings #-}
 module Main where
 
 import Control.Monad.Loops (whileM_)
-import Data.Functor ((<$>))
 import qualified Data.Vector.Storable as V
 import Data.Maybe (fromJust)
-import Data.Default
 import Data.Word
 
 import qualified Graphics.UI.GLFW as GLFW

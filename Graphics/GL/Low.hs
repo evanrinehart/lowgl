@@ -25,10 +25,6 @@ module Graphics.GL.Low (
   --
   -- @"Graphics.GL.Low.Render"@
   --
-  -- @"Graphics.GL.Low.Color"@
-  --
-  -- @"Graphics.GL.Low.Depth"@
-  -- 
   -- @"Graphics.GL.Low.Stencil"@
   --
   -- @"Graphics.GL.Low.Blending"@
@@ -76,7 +72,7 @@ module Graphics.GL.Low (
   -- ** Vertex Attributes
   -- | See also "Graphics.GL.Low.VertexAttrib".
   setVertexLayout,
-  VertexLayout(..),
+  LayoutElement(..),
   DataType(..),
 
 
@@ -127,13 +123,11 @@ module Graphics.GL.Low (
   IndexFormat(..),
 
   -- ** Color Buffer
-  -- | See also "Graphics.GL.Low.Color".
   enableColorWriting,
   disableColorWriting,
   clearColorBuffer,
 
   -- ** Depth Test
-  -- | See also "Graphics.GL.Low.Depth".
   enableDepthTest,
   disableDepthTest,
   clearDepthBuffer,
@@ -192,8 +186,6 @@ import Graphics.GL.Low.VertexAttrib
 import Graphics.GL.Low.Texture
 import Graphics.GL.Low.Framebuffer
 import Graphics.GL.Low.Blending
-import Graphics.GL.Low.Color
-import Graphics.GL.Low.Depth
 import Graphics.GL.Low.Stencil
 import Graphics.GL.Low.Render
 import Graphics.GL.Low.Cube

@@ -51,11 +51,9 @@ library
   exposed-modules:     Graphics.GL.Low
                        Graphics.GL.Low.Blending
                        Graphics.GL.Low.BufferObject
-                       Graphics.GL.Low.Color
                        Graphics.GL.Low.Classes
                        Graphics.GL.Low.Cube
                        Graphics.GL.Low.Common
-                       Graphics.GL.Low.Depth
                        Graphics.GL.Low.Error
                        Graphics.GL.Low.EntirePictureUpFront
                        Graphics.GL.Low.Framebuffer

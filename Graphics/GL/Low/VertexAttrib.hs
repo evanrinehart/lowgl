@@ -13,11 +13,13 @@ module Graphics.GL.Low.VertexAttrib (
 --                                    --   and mapped to: in float seed;
 -- @
 --
--- In this example four mappings from the current VBO to the variables
--- in the current Program will be established in the current VAO.
+-- In this example four mappings from a hypothetical VBO to the variables in
+-- the current Program will be established in the current VAO. Then, to use the
+-- shader program for rendering (with this VAO bound) you must first bind a
+-- compatible VBO.
 
   setVertexLayout,
-  VertexLayout(..),
+  LayoutElement(..),
   DataType(..)
 ) where
 
@@ -35,7 +37,7 @@ import Graphics.GL.Low.Classes
 -- component format and number of components for that attribute in the
 -- vertex data. Alternatively the size of an unused section of the data
 -- in bytes.
-data VertexLayout =
+data LayoutElement =
   Attrib String Int DataType | -- ^ Name, component count and component format of a vertex attribute.
   Unused Int -- ^ Size in bytes of an unused section of the vertex data.
     deriving Show
@@ -53,7 +55,7 @@ data DataType =
 
 -- | This configures the currently bound VAO. It calls glVertexAttribPointer
 -- and glEnableVertexAttribArray.
-setVertexLayout :: [VertexLayout] -> IO ()
+setVertexLayout :: [LayoutElement] -> IO ()
 setVertexLayout layout = do
   p <- alloca (\ptr -> glGetIntegerv GL_CURRENT_PROGRAM ptr >> peek ptr)
   if p == 0
@@ -83,7 +85,7 @@ instance ToGL DataType where
   toGL GLInt           = GL_INT
   toGL GLUnsignedInt   = GL_UNSIGNED_INT
 
-elaborateLayout :: Int -> [VertexLayout] -> [(String, Int, Int, DataType)]
+elaborateLayout :: Int -> [LayoutElement] -> [(String, Int, Int, DataType)]
 elaborateLayout here layout = case layout of
   [] -> []
   (Unused n):xs -> elaborateLayout (here+n) xs
@@ -91,7 +93,7 @@ elaborateLayout here layout = case layout of
     let size = n * sizeOfType ty in
     (name, n, here, ty) : elaborateLayout (here+size) xs
 
-totalLayout :: [VertexLayout] -> Int
+totalLayout :: [LayoutElement] -> Int
 totalLayout layout = sum (map arraySize layout) where
   arraySize (Unused n) = n
   arraySize (Attrib _ n ty) = n * sizeOfType ty

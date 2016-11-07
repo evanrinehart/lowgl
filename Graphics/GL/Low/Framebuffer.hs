@@ -47,7 +47,6 @@ import Foreign.Ptr
 import Foreign.Marshal
 import Foreign.Storable
 
-import Data.Default
 import Graphics.GL
 
 import Graphics.GL.Low.Types
@@ -86,7 +85,7 @@ attachTex2D tex =
     (texObjectName tex)
     0
 
--- | Attach one of the sides of a cubemap texture to the FBO currently bound
+-- | Attach one of the sides of a cube map texture to the FBO currently bound
 -- to the framebuffer binding target.
 attachCubeMap :: Texture -> (forall a . Cube a -> a) -> IO ()
 attachCubeMap tex side =
@@ -107,7 +106,7 @@ attachRBO rbo =
     GL_RENDERBUFFER
     (rboObjectName rbo)
 
--- | Create a new renderbuffer with the specified dimensions.
+-- | Create a new renderbuffer object with the specified dimensions and format.
 newRBO :: Int -> Int -> ImageFormat -> IO RBO
 newRBO w h format = do
   orig <- getRenderbufferBinding
@@ -141,15 +140,13 @@ deleteRBO rbo =
 -- This example program renders an animating object to an off-screen
 -- framebuffer. The resulting texture is then shown on a full-screen quad
 -- with an effect.
---
+-- 
 -- @
 -- module Main where
--- 
+--
 -- import Control.Monad.Loops (whileM_)
--- import Data.Functor ((\<$\>))
 -- import qualified Data.Vector.Storable as V
 -- import Data.Maybe (fromJust)
--- import Data.Default
 -- import Data.Word
 -- 
 -- import qualified Graphics.UI.GLFW as GLFW
@@ -169,9 +166,9 @@ deleteRBO rbo =
 --       GLFW.makeContextCurrent (Just win)
 --       GLFW.swapInterval 1
 --       (vao1, vao2, prog1, prog2, fbo, texture) <- setup
---       whileM_ (not <$> GLFW.windowShouldClose win) $ do
+--       whileM_ (not \<$\> GLFW.windowShouldClose win) $ do
 --         GLFW.pollEvents
---         t <- (realToFrac . fromJust) \<$\> GLFW.getTime
+--         t \<- (realToFrac . fromJust) \<$\> GLFW.getTime
 --         draw vao1 vao2 prog1 prog2 fbo texture t
 --         GLFW.swapBuffers win
 -- 
@@ -183,8 +180,8 @@ deleteRBO rbo =
 --         [ -0.5, -0.5, 0, 0
 --         ,  0,    0.5, 0, 1
 --         ,  0.5, -0.5, 1, 1] :: V.Vector Float
---   vbo <- newVBO blob StaticDraw
---   bindVBO vbo
+--   vbo1 <- newBufferObject blob StaticDraw
+--   bindVBO vbo1
 --   vsource  <- readFile "framebuffer.vert"
 --   fsource1 <- readFile "framebuffer1.frag"
 --   prog1 <- newProgram vsource fsource1
@@ -201,20 +198,20 @@ deleteRBO rbo =
 --         , -1,  1, 0, 1
 --         ,  1, -1, 1, 0
 --         ,  1,  1, 1, 1] :: V.Vector Float
---   vbo <- newVBO blob StaticDraw
---   bindVBO vbo
---   indices <- newElementArray (V.fromList [0,1,2,3,2,1] :: V.Vector Word8) StaticDraw
+--   vbo2 <- newBufferObject blob StaticDraw
+--   bindVBO vbo2
+--   setVertexLayout
+--     [ Attrib "position" 2 GLFloat
+--     , Attrib "texcoord" 2 GLFloat ]
+--   indices <- newBufferObject (V.fromList [0,1,2,3,2,1] :: V.Vector Word8) StaticDraw
 --   bindElementArray indices
 --   fsource2 <- readFile "framebuffer2.frag"
 --   prog2 <- newProgram vsource fsource2
 --   useProgram prog2
---   setVertexLayout
---     [ Attrib "position" 2 GLFloat
---     , Attrib "texcoord" 2 GLFloat ]
 -- 
 --   -- create an FBO to render the primary scene on
 --   fbo <- newFBO
---   bindFramebuffer fbo
+--   bindFBO fbo
 --   texture <- newEmptyTexture2D 640 480 RGB
 --   bindTexture2D texture
 --   setTex2DFiltering Linear
@@ -223,20 +220,17 @@ deleteRBO rbo =
 -- 
 -- draw :: VAO -> VAO -> Program -> Program -> FBO -> Texture -> Float -> IO ()
 -- draw vao1 vao2 prog1 prog2 fbo texture t = do
---   -- render primary scene to fbo
 --   bindVAO vao1
---   bindFramebuffer fbo
+--   bindFBO fbo
 --   useProgram prog1
 --   clearColorBuffer (0,0,0)
 --   setUniform1f "time" [t]
 --   drawTriangles 3
 -- 
---   -- render results to quad on main screen
 --   bindVAO vao2
 --   bindDefaultFramebuffer
 --   useProgram prog2
 --   bindTexture2D texture
---   clearColorBuffer (0,0,0)
 --   setUniform1f "time" [t]
 --   drawIndexedTriangles 6 UByteIndices
 -- @

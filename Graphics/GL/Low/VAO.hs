@@ -1,38 +1,36 @@
 
 module Graphics.GL.Low.VAO (
 
--- | Vertex Array Objects (VAO). Despite having almost no operations of its
--- own, the VAO mechanism is one of the most complex pieces of OpenGL. A VAO
--- has mutable state which associates vertex shader input variables (actually
--- the integer location of the variable) with three things:
+-- | Vertex Array Objects (VAO) are at the core of controlling OpenGL. Each VAO
+-- has mutable state which associates vertex shader input variables with three
+-- things:
 --
 -- - The VBO to read from.
--- - The position in the vertex array to read from.
+-- - Where in the VBO to read from.
 -- - The interpretation of the bytes found there (32-bit float, 16-bit int, etc).
 --
--- You set these VAO parameters with the following dance:
+-- You set these VAO parameters with a sequence of commands:
 --
 -- - Bind a VAO
 -- - Bind a VBO
 -- - Use a Program
--- - call 'Graphics.GL.Low.VertexAttrib.setVertexLayout' which will
--- lookup the position of the input variables and issue the appropriate
--- glVertexAttribPointer calls.
+-- - Call 'Graphics.GL.Low.VertexAttrib.setVertexLayout'
 --
 -- After a VAO is configured against a Program, either one can be swapped in or
--- out freely. They will still work when both are swapped back in together.
+-- out freely. They will still work when both are swapped back in together. An
+-- "in-use" shader program will use whatever VAO is bound for getting its
+-- vertex inputs. It is up to the programmer to ensure that the VAO has been
+-- configured with the right variable positions for the current shader.
 --
--- An "in-use" program will use whatever VAO is bound for getting its vertex
--- inputs. It is up to the programmer to ensure that the VAO has been
--- configured with the right variable positions for the current program. Two
--- ways to do this are to use a consistent set of variables for all shaders or
--- restrict a set of VAOs to only be allowed with specific Program objects.
+-- After being bound, VAOs will also remember the last element array that is
+-- bound to the element array buffer binding target. Later on, when a VAO is
+-- re-bound, the element array will be restored automatically.
 --
--- The currently bound VBO is not remembered or restored by binding a VAO, but
--- the currently bound ElementArray is. This detail won't affect you if you
--- always explicitly bind an ElementArray after binding a VAO. Alternatively
--- you can exploit this to bundle particular models and their element arrays
--- as a VAO.
+-- __Gotcha:__ VAOs do /not/ remember what is bound to the array buffer binding
+-- target. So VBOs will not be restored when a VAO is bound.
+--
+-- A VAO must be created and bound with `bindVAO` before you can see any
+-- graphics.
 --
 -- Diagram of possible VAO contents:
 --
@@ -70,7 +68,7 @@ import Graphics.GL.Low.Types
 import Graphics.GL.Low.Classes
 
 -- | Create a new VAO. The only thing you can do with a VAO is bind it to
--- the vertex array binding target.
+-- the vertex array binding target (bindVAO) or delete it.
 newVAO :: IO VAO
 newVAO = do
   n <- alloca (\ptr -> glGenVertexArrays 1 ptr >> peek ptr)

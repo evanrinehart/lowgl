@@ -6,6 +6,9 @@ module Graphics.GL.Low.Render (
   -- the current shader program. The integer argument is the number of
   -- vertices to read from the VBOs via the current VAO.
   --
+  -- So VAO, VBO, Program, and FBO (or default framebuffer) must already be
+  -- setup to render these primitives.
+  --
   drawPoints,
   drawLines,
   drawLineStrip,
@@ -17,8 +20,11 @@ module Graphics.GL.Low.Render (
   -- * Primitives (by index)
   --
   -- | Render various kinds of primitives by traversing the vertices in the
-  -- order specified in the current ElementArray. The format argument indicates
-  -- the size of each index in the ElementArray.
+  -- order specified in the current element array. The format argument indicates
+  -- the size of each index in the element array.
+  --
+  -- So to render primitives this way, you need the VAO, VBO, Program, FBO,
+  -- and the element array already setup.
   --
   drawIndexedPoints,
   drawIndexedLines,
@@ -32,7 +38,7 @@ module Graphics.GL.Low.Render (
   enableScissorTest,
   disableScissorTest,
 
-  -- * Facet Culling
+  -- * Face Culling
   enableCulling,
   disableCulling,
 
@@ -41,7 +47,17 @@ module Graphics.GL.Low.Render (
 
   Culling(..),
   Viewport(..),
-  IndexFormat(..)
+  IndexFormat(..),
+
+  -- * Color Buffer
+  enableColorWriting,
+  disableColorWriting,
+  clearColorBuffer,
+
+  -- * Depth Buffer
+  enableDepthTest,
+  disableDepthTest,
+  clearDepthBuffer
 ) where
 
 import Foreign.Ptr
@@ -52,7 +68,7 @@ import Graphics.GL
 
 import Graphics.GL.Low.Classes
 
--- | Facet culling modes.
+-- | Face culling modes.
 data Culling =
   CullFront |
   CullBack |
@@ -145,7 +161,7 @@ disableScissorTest :: IO ()
 disableScissorTest = glDisable GL_SCISSOR_TEST
 
 
--- | Enable facet culling. The argument specifies whether front faces, back
+-- | Enable face culling. The argument specifies whether front faces, back
 -- faces, or both will be omitted from rendering. If both front and back
 -- faces are culled you can still render points and lines.
 enableCulling :: Culling -> IO ()
@@ -156,7 +172,7 @@ enableCulling c = do
     CullFrontAndBack -> glCullFace GL_FRONT_AND_BACK
   glEnable GL_CULL_FACE
 
--- | Disable facet culling. Front and back faces will now be rendered.
+-- | Disable face culling. Front and back faces will now be rendered.
 disableCulling :: IO ()
 disableCulling = glDisable GL_CULL_FACE
 
@@ -164,3 +180,33 @@ disableCulling = glDisable GL_CULL_FACE
 setViewport :: Viewport -> IO ()
 setViewport (Viewport x y w h) =
   glViewport (fromIntegral x) (fromIntegral y) (fromIntegral w) (fromIntegral h)
+
+-- | Allow rendering commands to modify the color buffer of the current
+-- framebuffer.
+enableColorWriting :: IO ()
+enableColorWriting = glColorMask GL_TRUE GL_TRUE GL_TRUE GL_TRUE
+
+-- | Disable rendering to color buffer.
+disableColorWriting :: IO ()
+disableColorWriting = glColorMask GL_FALSE GL_FALSE GL_FALSE GL_FALSE
+
+-- | Clear the color buffer of the current framebuffer with the specified
+-- color. Has no effect if writing to the color buffer is disabled.
+clearColorBuffer :: Real a => (a,a,a) -> IO ()
+clearColorBuffer (r, g, b) = do
+  glClearColor (realToFrac r) (realToFrac g) (realToFrac b) 1.0
+  glClear GL_COLOR_BUFFER_BIT
+
+-- | Enable the depth test. Attempting to render pixels with a depth value
+-- greater than the depth buffer at those pixels will have no effect. Otherwise
+-- the depth in the buffer will get updated to the new pixel's depth.
+enableDepthTest :: IO ()
+enableDepthTest = glEnable GL_DEPTH_TEST
+
+-- | Disable the depth test and depth buffer updates.
+disableDepthTest :: IO ()
+disableDepthTest = glDisable GL_DEPTH_TEST
+
+-- | Clear the depth buffer with the maximum depth value.
+clearDepthBuffer :: IO ()
+clearDepthBuffer = glClear GL_DEPTH_BUFFER_BIT

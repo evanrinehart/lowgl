@@ -3,8 +3,8 @@
 module Graphics.GL.Low.Shader (
 -- | A shader program is composed of two cooperating parts: the vertex program
 -- and the fragment program. The vertex program is executed once for each
--- vertex. The fragment program is executed once for each pixel covered by
--- a rasterized primitive (actually this is more complicated but close enough).
+-- vertex. The fragment program is executed once for each pixel covered by a
+-- rasterized primitive.
 --
 -- The inputs to the vertex program are:
 --
@@ -15,11 +15,11 @@ module Graphics.GL.Low.Shader (
 --
 -- - clip space position of the vertex, gl_Position
 -- - any number of variables matching inputs to the fragment program
--- - (if rendering a point, then you can set gl_PointSize)
+-- - (if rendering a point, you can also set gl_PointSize)
 --
 -- The inputs to the fragment program are:
 --
--- - the previously mentioned outputs of the vertex program (interpolated)
+-- - interpolated outputs of the vertex program
 -- - the window position of the pixel, gl_FragCoord
 -- - samplers (see "Graphics.GL.Low.Texture")
 -- - uniforms
@@ -28,8 +28,8 @@ module Graphics.GL.Low.Shader (
 --
 -- The outputs of the fragment program are:
 --
--- - a color (this is more complicated in reality but close enough)
 -- - the depth of the pixel, gl_FragDepth, which will default to the pixel's Z.
+-- - color of the pixel.
 --
   newProgram,
   newProgramSafe,

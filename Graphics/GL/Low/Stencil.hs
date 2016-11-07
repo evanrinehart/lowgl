@@ -28,7 +28,6 @@ module Graphics.GL.Low.Stencil (
   StencilOp(..)
 ) where
 
-import Data.Default
 import Data.Bits
 import Data.Word
 
@@ -61,7 +60,7 @@ clearStencilBuffer = glClear GL_STENCIL_BUFFER_BIT
 --     , onBothPass = Replace }
 -- @
 basicStencil :: Stencil
-basicStencil = def
+basicStencil = defaultStencil
   { func = Greater
   , ref = 1
   , onBothPass = Replace }
@@ -78,20 +77,18 @@ data Stencil = Stencil
 -- | The default state of the stencil, if it were simply enabled, would be
 -- to always pass and update nothing in the buffer. It would have no effect
 -- on rendering.
-instance Default Stencil where
-  def = Stencil
-    { func = Always
-    , ref  = 0
-    , mask = complement 0
-    , onStencilFail = Keep
-    , onDepthFail   = Keep
-    , onBothPass    = Keep }
+defaultStencil :: Stencil
+defaultStencil = Stencil
+  { func = Always
+  , ref  = 0
+  , mask = complement 0
+  , onStencilFail = Keep
+  , onDepthFail   = Keep
+  , onBothPass    = Keep }
 
 -- the proper implementation of toList f is the one that for any
 -- g :: t a -> [a] you can make a unique k such that g = k . f
 -- jle`
-  
-
 
 -- | The stencil test passes under what condition.
 data StencilFunc =
@@ -115,7 +112,6 @@ instance ToGL StencilFunc where
     Equal -> GL_EQUAL
     NotEqual -> GL_NOTEQUAL
     Always -> GL_ALWAYS
-
 
 -- | Modification action for the stencil buffer. 
 data StencilOp =

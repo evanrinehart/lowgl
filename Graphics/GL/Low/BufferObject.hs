@@ -77,7 +77,8 @@ instance ToGL UsageHint where
   toGL DynamicDraw = GL_DYNAMIC_DRAW
   toGL StreamDraw  = GL_STREAM_DRAW
 
--- | Use this to create VBOs or element arrays from raw data.
+-- | Use this to create VBOs or element arrays from raw data. Choose the
+-- usage hint based on how often you expect to modify the VBO's contents.
 newBufferObject :: Storable a => Vector a -> UsageHint -> IO BufferObject
 newBufferObject = newBufferObjectNonClobbering GL_ARRAY_BUFFER
 

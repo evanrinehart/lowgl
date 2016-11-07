@@ -132,7 +132,6 @@ newEmptyTexture2D w h format = do
 
 -- | Create a cubemap texture where each of the six sides has the specified
 -- dimensions and format. 
--- target.
 newEmptyCubeMap :: Int -> Int -> ImageFormat -> IO Texture
 newEmptyCubeMap w h format = do
   orig <- getCubemapBinding
@@ -191,7 +190,7 @@ setTex2DWrapping wrap = do
   glTexParameteri GL_TEXTURE_2D GL_TEXTURE_WRAP_T (toGL wrap)
 
 -- | Set the wrapping mode for the cubemap texture currently bound to the
--- cubemap texture binding target. Because no blending occurs between cube
+-- cubemap texture binding target. Because no filtering occurs between cube
 -- faces you probably want ClampToEdge.
 setCubeMapWrapping :: Wrapping -> IO ()
 setCubeMapWrapping wrap = do
@@ -225,9 +224,9 @@ instance ToGL Wrapping where
 --
 -- <<texture.png Screenshot of Texture Example>>
 --
--- This example loads a 256x256 PNG file with JuicyPixels and displays the
--- image on a square. Of course without a correction for aspect ratio the
--- square will only be square if you adjust your window to be square.
+-- This example loads a PNG file with JuicyPixels and displays the image on a
+-- square. Since the window is not square and no aspect ratio transformation
+-- was applied, the picture is squished.
 --
 -- @
 -- module Main where
