@@ -111,14 +111,6 @@ basicBlending = Blending
   , blendFunc = FuncAdd
   , blendColor = (0,0,0,0) }
 
--- | Configuration for no blending. @Blending BlendOne BlendZero FuncAdd (0,0,0,0)@
-noBlending :: Blending
-noBlending = Blending
-  { sFactor = BlendOne
-  , dFactor = BlendZero
-  , blendFunc = FuncAdd
-  , blendColor = (0,0,0,0) }
-
 
 -- $example
 --
